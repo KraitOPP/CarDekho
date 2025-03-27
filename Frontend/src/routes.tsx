@@ -7,6 +7,8 @@ import AuthLayout from "./Layout/authLayout";
 import MainLayout from "./Layout/mainLayout";
 import ProfilePage from "./Pages/User/profile";
 import ForgetPasswordPage from "./Pages/Authentication/forget-password";
+import ContactPage from "./Pages/ContactPage";
+import CarBookingPage from "./Pages/BookingPage";
 
 export const router = createBrowserRouter([
   {
@@ -22,8 +24,16 @@ export const router = createBrowserRouter([
         element: <HomePage />
       },
       {
+        path:"/car/:id",
+        element: <CarBookingPage />
+      },
+      {
           path: "u/profile",
           element: <ProfilePage />
+      },
+      {
+          path: "contact-us",
+          element: <ContactPage />
       },
     ]
   },
