@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useLocation } from "react-router-dom"
+import { useLocation, useNavigate } from "react-router-dom"
 import {
   Command,
   Frame,
@@ -8,11 +8,22 @@ import {
   User,
   HomeIcon,
   LifeBuoy,
+  PlusCircle,
+  Edit,
+  Folder,
+  MoreHorizontal,
+  type LucideIcon,
+  AlignEndHorizontal,
+  Car,
+  MessageCircle,
+  ReceiptIndianRupeeIcon,
+  UserSearchIcon,
 } from "lucide-react"
 
 import { NavMain } from "@/components/Sidebar/nav-main"
 import { NavProjects } from "@/components/Sidebar/nav-projects"
 import { NavUser } from "@/components/Sidebar/nav-user"
+import { NavSecondary } from "@/components/Sidebar/nav-secondary"
 import {
   Sidebar,
   SidebarContent,
@@ -22,64 +33,22 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { NavSecondary } from "./nav-secondary"
 
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  navMain: [
-    {
-      title: "Home",
-      url: "/",
-      icon: HomeIcon,
-      isActive: true,
-    },
-    {
-      title: "Profile",
-      url: "/u/profile",
-      icon: User,
-      items: [
-        {
-          title: "View Profile",
-          url: "/u/profile",
-        },
-        {
-          title: "Settings",
-          url: "/u/settings",
-        },
-      ],
-    },
-  ],
-  projects: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: Frame,
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: PieChart,
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: Map,
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Support",
-      url: "/contact-us",
-      icon: LifeBuoy,
-    },
-  ],
+type DropdownItem = {
+  label: string
+  icon: LucideIcon
+  onClick?: () => void
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+type ProjectItem = {
+  name: string
+  url: string
+  icon: LucideIcon
+  dropdownItems?: DropdownItem[]
+}
+
+export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
+  const navigate = useNavigate()
   const [expandedMenus, setExpandedMenus] = React.useState<{ [key: string]: boolean }>({})
   const location = useLocation()
 
@@ -94,6 +63,88 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       ...prev,
       [menuTitle]: !prev[menuTitle],
     }))
+  }
+
+  const data = {
+    user: {
+      name: "shadcn",
+      email: "m@example.com",
+      avatar: "/avatars/shadcn.jpg",
+    },
+    navMain: [
+      {
+        title: "Home",
+        url: "/",
+        icon: HomeIcon,
+        isActive: true,
+      },
+      {
+        title: "Profile",
+        url: "/u/profile",
+        icon: User,
+        items: [
+          {
+            title: "View Profile",
+            url: "/u/profile",
+          },
+          {
+            title: "Settings",
+            url: "/u/settings",
+          },
+        ],
+      },
+    ],
+    Dashboard: [
+      {
+        name: "Dashboard",
+        url: "/dashboard",
+        icon: AlignEndHorizontal,
+      },
+      {
+        name: "Vehicle Management",
+        url: "/dashboard/vehicle",
+        icon: Car,
+        dropdownItems: [
+          {
+            label: "Add Vehicle",
+            icon: PlusCircle,
+            onClick: () => navigate("/dashboard/vehicle")
+          },
+          {
+            label: "Manage Brands",
+            icon: Edit,
+            onClick: () => navigate("/dashboard/vehicle/brands")
+          },
+          {
+            label: "View All Vehicles",
+            icon: Folder,
+            onClick: () => navigate("/")
+          }
+        ]
+      },
+      {
+        name: "Booking Management",
+        url: "/dashboard/booking",
+        icon: ReceiptIndianRupeeIcon
+      },
+      {
+        name: "User Management",
+        url: "/dashboard/users",
+        icon: UserSearchIcon
+      },
+      {
+        name: "Testimonial Management",
+        url: "/dashboard/testimonial",
+        icon: MessageCircle
+      },
+    ],
+    navSecondary: [
+      {
+        title: "Support",
+        url: "/contact-us",
+        icon: LifeBuoy,
+      },
+    ],
   }
 
   return (
@@ -116,7 +167,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} expandedMenus={expandedMenus} onToggle={toggleMenu} />
-        <NavProjects projects={data.projects} />
+        <NavProjects projects={data.Dashboard} />
       </SidebarContent>
       <SidebarFooter>
         <NavSecondary items={data.navSecondary} />

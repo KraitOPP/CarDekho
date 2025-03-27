@@ -9,6 +9,13 @@ import ProfilePage from "./Pages/User/profile";
 import ForgetPasswordPage from "./Pages/Authentication/forget-password";
 import ContactPage from "./Pages/ContactPage";
 import CarBookingPage from "./Pages/BookingPage";
+import CarRentalTestimonialPage from "./Pages/PostTestimonials";
+import VehicleBrandManagement from "./Pages/Admin/AddBrand";
+import VehicleManagement from "./Pages/Admin/AddVehicle";
+import Dashboard from "./Pages/Admin/Dashboard";
+import TestimonialManagement from "./Pages/Admin/TestimonialManagement";
+import BookingManagement from "./Pages/Admin/BookingManagement";
+import CustomerManagement from "./Pages/Admin/CustomerManagement";
 
 export const router = createBrowserRouter([
   {
@@ -28,8 +35,12 @@ export const router = createBrowserRouter([
         element: <CarBookingPage />
       },
       {
-          path: "u/profile",
-          element: <ProfilePage />
+        path: "u/profile",
+        element: <ProfilePage />
+      },
+      {
+        path:"/testimonial/add-new",
+        element: <CarRentalTestimonialPage />
       },
       {
           path: "contact-us",
@@ -52,6 +63,36 @@ export const router = createBrowserRouter([
       {
           path: "forget-password",
           element: <ForgetPasswordPage />
+      },
+    ]
+  },
+  {
+    path: "/dashboard/",
+    element: <MainLayout />,
+    children:[
+      {
+          path: "",
+          element: <Dashboard />
+      },
+      {
+          path: "booking",
+          element: <BookingManagement />
+      },
+      {
+          path: "users",
+          element: <CustomerManagement />
+      },
+      {
+          path: "vehicle",
+          element: <VehicleManagement />
+      },
+      {
+          path: "vehicle/brands",
+          element: <VehicleBrandManagement />
+      },
+      {
+          path: "testimonial",
+          element: <TestimonialManagement />
       },
     ]
   },

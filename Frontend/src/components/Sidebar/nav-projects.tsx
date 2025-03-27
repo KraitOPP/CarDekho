@@ -1,8 +1,11 @@
+import * as React from "react"
 import {
   Folder,
   MoreHorizontal,
   Share,
   Trash2,
+  PlusCircle,
+  Edit,
   type LucideIcon,
 } from "lucide-react"
 
@@ -23,6 +26,13 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 
+// Define a type for dropdown menu items
+type DropdownItem = {
+  label: string
+  icon: LucideIcon
+  onClick?: () => void
+}
+
 export function NavProjects({
   projects,
 }: {
@@ -30,13 +40,14 @@ export function NavProjects({
     name: string
     url: string
     icon: LucideIcon
+    dropdownItems?: DropdownItem[]
   }[]
 }) {
   const { isMobile } = useSidebar()
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
-      <SidebarGroupLabel>Projects</SidebarGroupLabel>
+      <SidebarGroupLabel>Admin</SidebarGroupLabel>
       <SidebarMenu>
         {projects.map((item) => (
           <SidebarMenuItem key={item.name}>
@@ -46,33 +57,34 @@ export function NavProjects({
                 <span>{item.name}</span>
               </a>
             </SidebarMenuButton>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuAction showOnHover>
-                  <MoreHorizontal />
-                  <span className="sr-only">More</span>
-                </SidebarMenuAction>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-48"
-                side={isMobile ? "bottom" : "right"}
-                align={isMobile ? "end" : "start"}
-              >
-                <DropdownMenuItem>
-                  <Folder className="text-muted-foreground" />
-                  <span>View Project</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Share className="text-muted-foreground" />
-                  <span>Share Project</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Trash2 className="text-muted-foreground" />
-                  <span>Delete Project</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            
+            {item.dropdownItems && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuAction showOnHover>
+                    <MoreHorizontal />
+                    <span className="sr-only">More</span>
+                  </SidebarMenuAction>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  className="w-48"
+                  side={isMobile ? "bottom" : "right"}
+                  align={isMobile ? "end" : "start"}
+                >
+                  {item.dropdownItems.map((dropdownItem, index) => (
+                    <React.Fragment key={dropdownItem.label}>
+                      <DropdownMenuItem onSelect={dropdownItem.onClick}>
+                        <dropdownItem.icon className="text-muted-foreground" />
+                        <span>{dropdownItem.label}</span>
+                      </DropdownMenuItem>
+                      {index < item.dropdownItems!.length - 1 && 
+                       (dropdownItem.label === "Delete" || dropdownItem.label === "Remove") && 
+                       <DropdownMenuSeparator />}
+                    </React.Fragment>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </SidebarMenuItem>
         ))}
         <SidebarMenuItem>
