@@ -16,6 +16,9 @@ import Dashboard from "./Pages/Admin/Dashboard";
 import TestimonialManagement from "./Pages/Admin/TestimonialManagement";
 import BookingManagement from "./Pages/Admin/BookingManagement";
 import CustomerManagement from "./Pages/Admin/CustomerManagement";
+import ContactManagement from "./Pages/Admin/ContactUsQueryManagement";
+import ContactUsManagement from "./Pages/Admin/ContactPageManagement";
+import BookingHistoryPage from "./Pages/User/BookingHistory";
 
 export const router = createBrowserRouter([
   {
@@ -37,6 +40,10 @@ export const router = createBrowserRouter([
       {
         path: "u/profile",
         element: <ProfilePage />
+      },
+      {
+        path: "u/booking-history",
+        element: <BookingHistoryPage />
       },
       {
         path:"/testimonial/add-new",
@@ -81,6 +88,14 @@ export const router = createBrowserRouter([
       {
           path: "users",
           element: <CustomerManagement />
+      },
+      {
+          path: "contact-us/query",
+          element: <ContactManagement />
+      },
+      {
+          path: "contact-us/edit",
+          element: <ContactUsManagement />
       },
       {
           path: "vehicle",

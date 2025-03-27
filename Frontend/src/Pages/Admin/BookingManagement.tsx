@@ -47,10 +47,8 @@ import {
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 
-// Booking Status Types
 type BookingStatus = 'pending' | 'confirmed' | 'in-progress' | 'completed' | 'cancelled';
 
-// Booking Interface
 interface Booking {
   id: number;
   customerName: string;
@@ -64,7 +62,6 @@ interface Booking {
 }
 
 const BookingManagement: React.FC = () => {
-  // Initial Booking Data
   const [bookings, setBookings] = useState<Booking[]>([
     {
       id: 1,
@@ -101,7 +98,6 @@ const BookingManagement: React.FC = () => {
     }
   ]);
 
-  // State for filters and modals
   const [statusFilter, setStatusFilter] = useState<BookingStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -110,7 +106,6 @@ const BookingManagement: React.FC = () => {
   const [isAddBookingOpen, setIsAddBookingOpen] = useState(false);
   const [newBooking, setNewBooking] = useState<Partial<Booking>>({});
 
-  // Status Color Mapping
   const statusColorMap = {
     'pending': 'secondary',
     'confirmed': 'default',
@@ -119,7 +114,6 @@ const BookingManagement: React.FC = () => {
     'cancelled': 'destructive'
   };
 
-  // Filtered and Searched Bookings
   const filteredBookings = useMemo(() => {
     return bookings.filter(booking => 
       (statusFilter === 'all' || booking.status === statusFilter) &&
@@ -129,14 +123,12 @@ const BookingManagement: React.FC = () => {
     );
   }, [bookings, statusFilter, searchQuery]);
 
-  // Update Booking Status
   const updateBookingStatus = (id: number, newStatus: BookingStatus) => {
     setBookings(bookings.map(booking => 
       booking.id === id ? { ...booking, status: newStatus } : booking
     ));
   };
 
-  // Cancel Booking
   const handleCancelBooking = () => {
     if (cancelBookingId) {
       updateBookingStatus(cancelBookingId, 'cancelled');
@@ -144,7 +136,6 @@ const BookingManagement: React.FC = () => {
     }
   };
 
-  // Add New Booking
   const handleAddBooking = () => {
     if (newBooking.customerName && newBooking.vehicleName) {
       const bookingToAdd: Booking = {

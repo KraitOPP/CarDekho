@@ -53,7 +53,7 @@ const Dashboard: React.FC = () => {
       title: 'Customer Management',
       icon: <Users className="h-6 w-6" />,
       count: '1,234 Customers',
-      route: '/customers',
+      route: '/dashboard/users',
       variant: 'secondary'
     },
     {

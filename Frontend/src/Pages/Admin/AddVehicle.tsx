@@ -21,7 +21,6 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Link } from 'react-router';
 
-// Type definitions
 interface Vehicle {
     brand: string;
     model: string;
@@ -69,7 +68,6 @@ const VehicleManagement: React.FC = () => {
     };
 
     const handleSubmit = () => {
-        // Validation and submission logic would go here
         console.log('Vehicle Data:', vehicle);
         alert('Vehicle submitted/updated!');
     };

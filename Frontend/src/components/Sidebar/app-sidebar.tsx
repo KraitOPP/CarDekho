@@ -2,22 +2,20 @@ import * as React from "react"
 import { useLocation, useNavigate } from "react-router-dom"
 import {
   Command,
-  Frame,
-  Map,
-  PieChart,
   User,
   HomeIcon,
   LifeBuoy,
   PlusCircle,
   Edit,
   Folder,
-  MoreHorizontal,
   type LucideIcon,
   AlignEndHorizontal,
   Car,
   MessageCircle,
   ReceiptIndianRupeeIcon,
   UserSearchIcon,
+  ContactRoundIcon,
+  MailQuestion,
 } from "lucide-react"
 
 import { NavMain } from "@/components/Sidebar/nav-main"
@@ -53,7 +51,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const location = useLocation()
 
   React.useEffect(() => {
-    if (location.pathname.startsWith("/u/profile")) {
+    if (location.pathname.startsWith("/u/")) {
       setExpandedMenus((prev) => ({ ...prev, Profile: true }))
     }
   }, [location])
@@ -88,8 +86,8 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
             url: "/u/profile",
           },
           {
-            title: "Settings",
-            url: "/u/settings",
+            title: "Booking History",
+            url: "/u/booking-history",
           },
         ],
       },
@@ -126,6 +124,23 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
         name: "Booking Management",
         url: "/dashboard/booking",
         icon: ReceiptIndianRupeeIcon
+      },
+      {
+        name: "Contact Management",
+        url: "/dashboard/contact-us/query",
+        icon: ContactRoundIcon,
+        dropdownItems: [
+          {
+            label: "Query Management",
+            icon: MailQuestion,
+            onClick: () => navigate("/dashboard/contact-us/query")
+          },
+          {
+            label: " Contact Details Update",
+            icon: Edit,
+            onClick: () => navigate("/dashboard/contact-us/edit")
+          },
+        ]
       },
       {
         name: "User Management",

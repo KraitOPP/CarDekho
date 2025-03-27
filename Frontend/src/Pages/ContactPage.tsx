@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { Link } from "react-router-dom";
@@ -6,11 +6,73 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Clock, MapPin, Phone, Mail, Linkedin, Twitter, Facebook } from "lucide-react";
 
-interface ContactFormProps {}
+// Define interfaces for configuration
+interface Location {
+  id: string;
+  address: string;
+  phone: string;
+  email: string;
+}
 
-const ContactForm: React.FC<ContactFormProps> = () => {
-  const [formData, setFormData] = React.useState({
+interface WorkingHour {
+  id: string;
+  day: string;
+  openTime: string;
+  closeTime: string;
+  isOpen: boolean;
+}
+
+interface SocialMedia {
+  id: string;
+  platform: string;
+  url: string;
+}
+
+interface ContactUsConfig {
+  companyName: string;
+  mainEmail: string;
+  mainPhone: string;
+  supportEmail: string;
+  locations: Location[];
+  workingHours: WorkingHour[];
+  socialMedia: SocialMedia[];
+  additionalInfo: string;
+}
+
+const ContactForm: React.FC = () => {
+  const [config] = useState<ContactUsConfig>({
+    companyName: 'Acme Corporation',
+    mainEmail: 'contact@acmecorp.com',
+    mainPhone: '+1 (555) 123-4567',
+    supportEmail: 'support@acmecorp.com',
+    locations: [
+      {
+        id: '1',
+        address: '123 Business Street, Suite 100, Cityville, State 12345',
+        phone: '+1 (555) 987-6543',
+        email: 'headquarters@acmecorp.com'
+      }
+    ],
+    workingHours: [
+      { id: '1', day: 'Monday', openTime: '09:00', closeTime: '17:00', isOpen: true },
+      { id: '2', day: 'Tuesday', openTime: '09:00', closeTime: '17:00', isOpen: true },
+      { id: '3', day: 'Wednesday', openTime: '09:00', closeTime: '17:00', isOpen: true },
+      { id: '4', day: 'Thursday', openTime: '09:00', closeTime: '17:00', isOpen: true },
+      { id: '5', day: 'Friday', openTime: '09:00', closeTime: '17:00', isOpen: true },
+      { id: '6', day: 'Saturday', openTime: '10:00', closeTime: '14:00', isOpen: true },
+      { id: '7', day: 'Sunday', openTime: '00:00', closeTime: '00:00', isOpen: false }
+    ],
+    socialMedia: [
+      { id: '1', platform: 'LinkedIn', url: 'https://linkedin.com/company/acmecorp' },
+      { id: '2', platform: 'Twitter', url: 'https://twitter.com/acmecorp' },
+      { id: '3', platform: 'Facebook', url: 'https://facebook.com/acmecorp' }
+    ],
+    additionalInfo: 'We are committed to providing excellent customer service.'
+  });
+
+  const [formData, setFormData] = useState({
     name: "",
     email: "",
     message: ""
@@ -32,39 +94,106 @@ const ContactForm: React.FC<ContactFormProps> = () => {
     console.log("Form submitted:", formData);
   };
 
+  // Social media icon mapping
+  const socialIcons = {
+    LinkedIn: <Linkedin className="w-5 h-5" />,
+    Twitter: <Twitter className="w-5 h-5" />,
+    Facebook: <Facebook className="w-5 h-5" />
+  };
+
   return (
     <section className="space-y-10 p-6 bg-gray-50 dark:bg-gray-800 rounded-lg shadow-md">
       <header className="space-y-2">
-        <h2 className="text-4xl font-extrabold text-gray-800 dark:text-white">Get in Touch</h2>
+        <h2 className="text-4xl font-extrabold text-gray-800 dark:text-white">
+          Contact {config.companyName}
+        </h2>
         <p className="text-lg text-gray-600 dark:text-gray-300">
-          We would love to hear from you! Whether you have a question, suggestion, or just want to say hello, feel free to reach out.
+          {config.additionalInfo}
         </p>
       </header>
+
       <div className="grid md:grid-cols-2 gap-8">
+        {/* Contact Details Card */}
         <Card>
           <CardHeader>
-            <h3 className="text-2xl font-bold text-gray-700 dark:text-gray-200">Contact Details</h3>
+            <h3 className="text-2xl font-bold text-gray-700 dark:text-gray-200">
+              Contact Information
+            </h3>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center space-x-3">
-              <Avatar prompt="postal address" className="w-6 h-6" />
-              <span className="text-gray-600 dark:text-gray-300">1234 Street, City, State, 56789</span>
+          <CardContent className="space-y-4">
+            {/* Locations */}
+            {config.locations.map(location => (
+              <div key={location.id} className="space-y-2">
+                <div className="flex items-center space-x-3">
+                  <MapPin className="w-6 h-6 text-gray-500" />
+                  <span className="text-gray-600 dark:text-gray-300">
+                    {location.address}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Phone className="w-6 h-6 text-gray-500" />
+                  <span className="text-gray-600 dark:text-gray-300">
+                    {location.phone}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <Mail className="w-6 h-6 text-gray-500" />
+                  <a 
+                    href={`mailto:${location.email}`} 
+                    className="text-blue-600 hover:underline"
+                  >
+                    {location.email}
+                  </a>
+                </div>
+              </div>
+            ))}
+
+            {/* Additional Contact Information */}
+            <div className="space-y-2 mt-4">
+              <div className="flex items-center space-x-3">
+                <Clock className="w-6 h-6 text-gray-500" />
+                <span className="text-gray-600 dark:text-gray-300">
+                  Business Hours
+                </span>
+              </div>
+              {config.workingHours.map(hours => (
+                <div 
+                  key={hours.id} 
+                  className="flex justify-between text-sm text-gray-500"
+                >
+                  <span>{hours.day}</span>
+                  <span>
+                    {hours.isOpen 
+                      ? `${hours.openTime} - ${hours.closeTime}` 
+                      : 'Closed'}
+                  </span>
+                </div>
+              ))}
             </div>
-            <div className="flex items-center space-x-3">
-              <Avatar prompt="phone number" className="w-6 h-6" />
-              <span className="text-gray-600 dark:text-gray-300">(123) 456-7890</span>
-            </div>
-            <div className="flex items-center space-x-3">
-              <Avatar prompt="email address" className="w-6 h-6" />
-              <Link to="/contact" className="text-black-600 hover:underline">
-                info@example.com
-              </Link>
+
+            {/* Social Media Links */}
+            <div className="flex space-x-4 mt-4">
+              {config.socialMedia.map(social => (
+                <a 
+                  key={social.id} 
+                  href={social.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-gray-600 hover:text-black dark:hover:text-white"
+                >
+                  {socialIcons[social.platform as keyof typeof socialIcons]}
+                </a>
+              ))}
             </div>
           </CardContent>
         </Card>
+
+        {/* Message Form Card */}
         <Card>
           <CardHeader>
-            <h3 className="text-2xl font-bold text-gray-700 dark:text-gray-200">Leave a Message</h3>
+            <h3 className="text-2xl font-bold text-gray-700 dark:text-gray-200">
+              Leave a Message
+            </h3>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">

@@ -96,12 +96,10 @@ const TestimonialManagement: React.FC = () => {
     if (!editingTestimonial) return;
 
     if (editingTestimonial.id && testimonials.some(t => t.id === editingTestimonial.id)) {
-      // Editing existing testimonial
       setTestimonials(testimonials.map(t => 
         t.id === editingTestimonial.id ? editingTestimonial : t
       ));
     } else {
-      // Adding new testimonial
       setTestimonials([...testimonials, editingTestimonial]);
     }
 
