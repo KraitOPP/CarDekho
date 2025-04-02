@@ -226,5 +226,21 @@ async function updateProfile(req, res) {
     return res.status(500).json({ error: 'Internal server error.' });
   }
 }
+async function getAllUsers(req, res) {
+  try {
+    const sql = `
+      SELECT 
+        id, name, email, phone_number, license_number 
+      FROM users
+    `;
+    const users = await executeQuery(sql);
 
-module.exports = { signup, login, getCurrUser, logout, updateProfile };
+    return res.status(200).json({ users });
+  } catch (error) {
+    console.error('Error in getAllUsers:', error.message);
+    return res.status(500).json({ error: 'Internal server error.' });
+  }
+}
+
+
+module.exports = { signup, login, getCurrUser, logout, updateProfile,getAllUsers};
