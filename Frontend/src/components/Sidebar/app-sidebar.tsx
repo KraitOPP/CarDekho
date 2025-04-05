@@ -31,7 +31,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { selectUser } from "@/slices/authSlice"
+import {  selectUser } from "@/slices/authSlice"
 import { useSelector } from "react-redux"
 
 type DropdownItem = {

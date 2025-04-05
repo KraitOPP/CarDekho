@@ -1,6 +1,5 @@
 import { fetchBaseQuery, createApi } from '@reduxjs/toolkit/query/react';
 import { logout } from './authSlice';
-import { error } from 'console';
 
 const SERVER_URL = import.meta.env.VITE_BACKEND_URL;
 
