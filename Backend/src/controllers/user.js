@@ -42,22 +42,8 @@ async function signup(req, res) {
       VALUES (?,?,?,?)
     `;
     const result = await executeQuery(insertQuery, [name, email, mobileNumber, hashedPassword]);
-    const userId = result.insertId;
 
-    const accessToken = jwt.sign({ id: userId, email }, JWT_ACCESS_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRES_IN });
-    const refreshToken = jwt.sign({ id: userId, email }, JWT_REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_EXPIRES_IN });
-
-    const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-    await executeQuery(
-      'UPDATE users SET refresh_token = ?, refresh_token_expires_at = ? WHERE id = ?',
-      [refreshToken, refreshExpiresAt, userId]
-    );
-
-    res.cookie('accessToken', accessToken, { httpOnly: true, maxAge: 3600000 });
-    res.cookie('refreshToken', refreshToken, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 }); 
-
-    return res.status(201).json({ message: 'User created successfully', userId, accessToken, refreshToken });
+    return res.status(201).json({ message: 'Sign Up Successfully'});
   } catch (error) {
     console.error('Signup error:', error);
     return res.status(500).json({ error: 'Internal server error.' });
@@ -88,17 +74,58 @@ async function login(req, res) {
 
     await executeQuery('UPDATE users SET refresh_token = ?, refresh_token_expires_at = ? WHERE id = ?', [refreshToken, refreshExpiresAt, user.id]);
 
-    res.cookie('accessToken', accessToken, { httpOnly: true, maxAge: 3600000 });
-    res.cookie('refreshToken', refreshToken, { httpOnly: true, maxAge: 7 * 24 * 60 * 60 * 1000 });
+    await res.cookie('refreshToken', refreshToken, { httpOnly: true, secure:"false", maxAge: 7 * 24 * 60 * 60 * 1000 });
 
-    return res.status(200).json({ message: 'Login successful', accessToken, refreshToken });
+    return res.status(200).json({ message: 'Login successful', 
+                                  accessToken, 
+                                  userInfo:{ 
+                                              id: user.id, 
+                                              name: user.name, 
+                                              email: user.email, 
+                                              phoneNumber: user.phone_number, 
+                                            } 
+                                });
   } catch (error) {
     console.error('Login error:', error);
     return res.status(500).json({ error: 'Internal server error.' });
   }
 }
 
-// Since authentication is handled by the middleware (which sets req.user), we can directly use it here.
+async function refresh(req, res) {
+  const refreshToken = req.cookies.refreshToken;
+  if (!refreshToken) {
+    return res.status(401).json({ error: 'Refresh token is required.' });
+  }
+
+  try {
+    const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
+    const userId = decoded.id;
+
+    const users = await executeQuery(
+      'SELECT * FROM users WHERE id = ? AND refresh_token = ?',
+      [userId, refreshToken]
+    );
+
+    if (users.length === 0) {
+      return res.status(403).json({ error: 'Invalid refresh token.' });
+    }
+
+    const user = users[0];
+
+    const newAccessToken = jwt.sign(
+      { id: user.id, email: user.email },
+      JWT_ACCESS_SECRET,
+      { expiresIn: ACCESS_TOKEN_EXPIRES_IN }
+    );
+
+    return res.status(200).json({ accessToken: newAccessToken });
+  } catch (error) {
+    console.error('Refresh token error:', error);
+    return res.status(403).json({ error: 'Invalid or expired refresh token.' });
+  }
+}
+
+
 async function getCurrUser(req, res) {
   try {
     const userId = req.user.id;
@@ -135,13 +162,11 @@ async function getCurrUser(req, res) {
 
 async function logout(req, res) {
   try {
-    // Since req.user is available from the auth middleware, we can use it directly.
     const userId = req.user.id;
 
     const sql = "UPDATE users SET refresh_token = NULL, refresh_token_expires_at = NULL WHERE id = ?";
     await executeQuery(sql, [userId]);
 
-    res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
 
     return res.status(200).json({ message: 'Logout successful' });
@@ -152,7 +177,6 @@ async function logout(req, res) {
 }
 
 async function updateProfile(req, res) {
-  // req.user is available, so no need to verify token again
   const userId = req.user.id;
   const { 
     email = null, 
@@ -216,7 +240,6 @@ async function updateProfile(req, res) {
       }
     }
 
-    // Update or insert both permanent and temporary addresses if provided
     await upsertAddress(permanentAddress, 'permanent');
     await upsertAddress(temporaryAddress, 'temporary');
 
@@ -243,4 +266,4 @@ async function getAllUsers(req, res) {
 }
 
 
-module.exports = { signup, login, getCurrUser, logout, updateProfile,getAllUsers};
+module.exports = { signup, login, getCurrUser, logout, updateProfile,getAllUsers, refresh};

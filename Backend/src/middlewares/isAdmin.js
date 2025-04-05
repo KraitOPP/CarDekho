@@ -4,8 +4,7 @@
     try {
         const user=req.user;
        
-    if(!user)
-    {
+    if(!user){
        
         return res.status(400).json({message:"User required"});
     }

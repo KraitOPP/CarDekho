@@ -31,6 +31,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { selectUser } from "@/slices/authSlice"
+import { useSelector } from "react-redux"
 
 type DropdownItem = {
   label: string
@@ -62,13 +64,9 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       [menuTitle]: !prev[menuTitle],
     }))
   }
+  const userInfo = useSelector(selectUser);
 
   const data = {
-    user: {
-      name: "shadcn",
-      email: "m@example.com",
-      avatar: "/avatars/shadcn.jpg",
-    },
     navMain: [
       {
         title: "Home",
@@ -186,7 +184,7 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <NavSecondary items={data.navSecondary} />
-        <NavUser user={data.user} />
+        <NavUser user={userInfo} />
       </SidebarFooter>
     </Sidebar>
   )

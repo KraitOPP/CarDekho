@@ -43,16 +43,16 @@ interface ContactUsConfig {
 
 const ContactForm: React.FC = () => {
   const [config] = useState<ContactUsConfig>({
-    companyName: 'Acme Corporation',
-    mainEmail: 'contact@acmecorp.com',
+    companyName: 'Car Dekho Corporation',
+    mainEmail: 'contact@cardekho.com',
     mainPhone: '+1 (555) 123-4567',
-    supportEmail: 'support@acmecorp.com',
+    supportEmail: 'support@cardekho.com',
     locations: [
       {
         id: '1',
         address: '123 Business Street, Suite 100, Cityville, State 12345',
         phone: '+1 (555) 987-6543',
-        email: 'headquarters@acmecorp.com'
+        email: 'headquarters@cardekho.com'
       }
     ],
     workingHours: [
@@ -90,11 +90,9 @@ const ContactForm: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // Add form submission logic here
     console.log("Form submitted:", formData);
   };
 
-  // Social media icon mapping
   const socialIcons = {
     LinkedIn: <Linkedin className="w-5 h-5" />,
     Twitter: <Twitter className="w-5 h-5" />,

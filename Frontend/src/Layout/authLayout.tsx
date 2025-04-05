@@ -1,25 +1,20 @@
 import { useEffect } from 'react';
 import { toast, Toaster } from "sonner"
+import { selectUser } from '@/slices/authSlice';
+import { useSelector } from 'react-redux';
 import { Outlet, useNavigate } from 'react-router-dom'
-// import { useSelector } from 'react-redux';
-// import { selectUser } from '@/slices/authSlice';
 
 export default function AuthLayout(){
 
     const navigate = useNavigate();
-    // const userInfo = useSelector(selectUser);
+    const userInfo = useSelector(selectUser);
 
-    // useEffect(() => {
-    //     if (userInfo){
-    //         toast("Already Signed In",{
-    //            description: "Redirecting to Menu",
-    //            action:{
-
-    //            } 
-    //         });
-    //         navigate('/menu', { replace: true });
-    //     }
-    // }, []);
+    useEffect(() => {
+        if (userInfo){
+            toast.warning("Already Signed In");
+            navigate('/', { replace: true });
+        }
+    }, [userInfo, navigate]);
 
     return (
         <>

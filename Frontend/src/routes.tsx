@@ -5,7 +5,6 @@ import LoginPage from "./Pages/Authentication/login";
 import RegisterPage from "./Pages/Authentication/register";
 import AuthLayout from "./Layout/authLayout";
 import MainLayout from "./Layout/mainLayout";
-import ProfilePage from "./Pages/User/profile";
 import ForgetPasswordPage from "./Pages/Authentication/forget-password";
 import ContactPage from "./Pages/ContactPage";
 import CarBookingPage from "./Pages/BookingPage";
@@ -19,6 +18,7 @@ import CustomerManagement from "./Pages/Admin/CustomerManagement";
 import ContactManagement from "./Pages/Admin/ContactUsQueryManagement";
 import ContactUsManagement from "./Pages/Admin/ContactPageManagement";
 import BookingHistoryPage from "./Pages/User/BookingHistory";
+import ProfilePage from "./Pages/User/profile";
 
 export const router = createBrowserRouter([
   {
