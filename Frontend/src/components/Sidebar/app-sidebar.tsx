@@ -107,6 +107,11 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
             onClick: () => navigate("/dashboard/vehicle")
           },
           {
+            label: "Add New Model",
+            icon: PlusCircle,
+            onClick: () => navigate("/dashboard/vehicle-model")
+          },
+          {
             label: "Manage Brands",
             icon: Edit,
             onClick: () => navigate("/dashboard/vehicle/brands")

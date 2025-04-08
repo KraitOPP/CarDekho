@@ -1,10 +1,7 @@
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-    Plus,
-    Trash2,
     Save,
-    X,
-    ImagePlus
+    AlertCircle
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,69 +15,75 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { Link } from 'react-router';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-interface Vehicle {
+interface VehicleModel {
+    id: string;
     brand: string;
     model: string;
     year: string;
-    category: string;
-    pricePerDay: string;
-    description: string;
-    features: string[];
-    imageUrl: string;
 }
 
-const VehicleManagement: React.FC = () => {
+interface Vehicle {
+    id?: string;
+    modelId: string;
+    registrationNumber: string;
+    licensePlate: string;
+    vin: string;
+    color: string;
+    mileage: string;
+    purchaseDate: string;
+    insurance: {
+        provider: string;
+        policyNumber: string;
+        expiryDate: string;
+        details: string;
+    };
+    isAvailable: boolean;
+}
+
+const AddVehicle: React.FC = () => {
+    // This would normally be fetched from your API
+    const [vehicleModels, setVehicleModels] = useState<VehicleModel[]>([
+        { id: '1', brand: 'Toyota', model: 'Corolla', year: '2023' },
+        { id: '2', brand: 'Honda', model: 'Civic', year: '2022' },
+        { id: '3', brand: 'Ford', model: 'Mustang', year: '2024' },
+    ]);
+
     const [vehicle, setVehicle] = useState<Vehicle>({
-        brand: '',
-        model: '',
-        year: '',
-        category: '',
-        pricePerDay: '',
-        description: '',
-        features: [],
-        imageUrl: ''
+        modelId: '',
+        registrationNumber: '',
+        licensePlate: '',
+        vin: '',
+        color: '',
+        mileage: '',
+        purchaseDate: '',
+        insurance: {
+            provider: '',
+            policyNumber: '',
+            expiryDate: '',
+            details: ''
+        },
+        isAvailable: true
     });
 
-    const brands: string[] = [
-        'Toyota', 'Ford', 'BMW', 'Mercedes', 'Honda'
-    ];
+    const [selectedModel, setSelectedModel] = useState<VehicleModel | null>(null);
 
-    const [newFeature, setNewFeature] = useState<string>('');
-
-    const handleAddFeature = () => {
-        if (newFeature.trim() && !vehicle.features.includes(newFeature.trim())) {
-            setVehicle({
-                ...vehicle,
-                features: [...vehicle.features, newFeature.trim()]
-            });
-            setNewFeature('');
+    useEffect(() => {
+        // Update selected model when modelId changes
+        if (vehicle.modelId) {
+            const model = vehicleModels.find(m => m.id === vehicle.modelId) || null;
+            setSelectedModel(model);
+        } else {
+            setSelectedModel(null);
         }
-    };
-
-    const handleRemoveFeature = (featureToRemove: string) => {
-        setVehicle({
-            ...vehicle,
-            features: vehicle.features.filter(feature => feature !== featureToRemove)
-        });
-    };
+    }, [vehicle.modelId, vehicleModels]);
 
     const handleSubmit = () => {
-        console.log('Vehicle Data:', vehicle);
+        console.log('Individual Vehicle Data:', vehicle);
         alert('Vehicle submitted/updated!');
-    };
-
-    const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setVehicle({ ...vehicle, imageUrl: reader.result as string });
-            };
-            reader.readAsDataURL(file);
-        }
     };
 
     const updateVehicleField = <K extends keyof Vehicle>(
@@ -93,164 +96,196 @@ const VehicleManagement: React.FC = () => {
         }));
     };
 
+    const updateInsuranceField = <K extends keyof Vehicle['insurance']>(
+        field: K,
+        value: Vehicle['insurance'][K]
+    ) => {
+        setVehicle(prev => ({
+            ...prev,
+            insurance: {
+                ...prev.insurance,
+                [field]: value
+            }
+        }));
+    };
+
     return (
         <div className="container mx-auto p-6">
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold">Add/Edit Vehicle</h1>
-                <Link to={'/dashboard'}>
-                    <Button variant="outline">
-                        Back to Dashboard
-                    </Button>
-
-                </Link>
+                <h1 className="text-3xl font-bold">Add Individual Vehicle</h1>
+                <div className="flex gap-3">
+                    <Link to={'/dashboard'}>
+                        <Button variant="outline">
+                            Back to Dashboard
+                        </Button>
+                    </Link>
+                    <Link to={'/vehicle-models/add'}>
+                        <Button>
+                            Add Vehicle Model
+                        </Button>
+                    </Link>
+                </div>
             </div>
+
+            {vehicleModels.length === 0 && (
+                <Alert variant="destructive" className="mb-6">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>No vehicle models found</AlertTitle>
+                    <AlertDescription>
+                        You need to create a vehicle model before adding individual vehicles.
+                        <div className="mt-2">
+                            <Link to={'/vehicle-models/add'}>
+                                <Button variant="outline" size="sm">
+                                    Add Vehicle Model
+                                </Button>
+                            </Link>
+                        </div>
+                    </AlertDescription>
+                </Alert>
+            )}
 
             <Card>
                 <CardContent className="p-6">
-                    <div className="grid md:grid-cols-2 gap-6">
+                    <div className="mb-6">
+                        <h2 className="text-xl font-semibold mb-4">Vehicle Model Selection</h2>
                         <div>
-                            <Label className="mb-2">Brand</Label>
+                            <Label className="mb-2">Select Vehicle Model</Label>
                             <Select
-                                value={vehicle.brand}
-                                onValueChange={(value) => updateVehicleField('brand', value)}
+                                value={vehicle.modelId}
+                                onValueChange={(value) => updateVehicleField('modelId', value)}
                             >
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Select Brand" />
+                                    <SelectValue placeholder="Select a Vehicle Model" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {brands.map(brand => (
-                                        <SelectItem key={brand} value={brand}>
-                                            {brand}
+                                    {vehicleModels.map(model => (
+                                        <SelectItem key={model.id} value={model.id}>
+                                            {model.brand} {model.model} ({model.year})
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
 
-                        <div>
-                            <Label className="mb-2">Model</Label>
-                            <Input
-                                placeholder="Vehicle Model"
-                                value={vehicle.model}
-                                onChange={(e) => updateVehicleField('model', e.target.value)}
-                            />
-                        </div>
-
-                        <div>
-                            <Label className="mb-2">Year</Label>
-                            <Input
-                                type="number"
-                                placeholder="Manufacturing Year"
-                                value={vehicle.year}
-                                onChange={(e) => updateVehicleField('year', e.target.value)}
-                            />
-                        </div>
-
-                        <div>
-                            <Label className="mb-2">Category</Label>
-                            <Select
-                                value={vehicle.category}
-                                onValueChange={(value) => updateVehicleField('category', value)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select Category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {['Economy', 'Sedan', 'SUV', 'Luxury', 'Van'].map(category => (
-                                        <SelectItem key={category} value={category}>
-                                            {category}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div>
-                            <Label className="mb-2">Price per Day</Label>
-                            <Input
-                                type="number"
-                                placeholder="Rental Price"
-                                value={vehicle.pricePerDay}
-                                onChange={(e) => updateVehicleField('pricePerDay', e.target.value)}
-                            />
-                        </div>
-
-                        <div>
-                            <Label className="mb-2">Image</Label>
-                            <div className="flex space-x-2">
-                                <Input
-                                    placeholder="Image URL"
-                                    value={vehicle.imageUrl}
-                                    onChange={(e) => updateVehicleField('imageUrl', e.target.value)}
-                                />
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    id="imageUpload"
-                                    onChange={handleImageUpload}
-                                />
-                                <Button
-                                    variant="outline"
-                                    size="icon"
-                                    onClick={() => document.getElementById('imageUpload')?.click()}
-                                >
-                                    <ImagePlus />
-                                </Button>
+                        {selectedModel && (
+                            <div className="mt-4 p-4 bg-slate-50 rounded-md">
+                                <p className="font-medium">Selected Model: {selectedModel.brand} {selectedModel.model}</p>
+                                <p className="text-sm text-slate-500">Year: {selectedModel.year}</p>
                             </div>
-                            {vehicle.imageUrl && (
-                                <div className="mt-2">
-                                    <img
-                                        src={vehicle.imageUrl}
-                                        alt="Vehicle"
-                                        className="w-32 h-32 object-cover rounded-md"
-                                    />
-                                </div>
-                            )}
+                        )}
+                    </div>
+
+                    <div className="mb-6">
+                        <h2 className="text-xl font-semibold mb-4">Vehicle Information</h2>
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div>
+                                <Label className="mb-2">Registration Number*</Label>
+                                <Input
+                                    placeholder="Registration Number"
+                                    value={vehicle.registrationNumber}
+                                    onChange={(e) => updateVehicleField('registrationNumber', e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <Label className="mb-2">License Plate*</Label>
+                                <Input
+                                    placeholder="License Plate"
+                                    value={vehicle.licensePlate}
+                                    onChange={(e) => updateVehicleField('licensePlate', e.target.value)}
+                                    required
+                                />
+                            </div>
+
+                            <div>
+                                <Label className="mb-2">VIN Number</Label>
+                                <Input
+                                    placeholder="Vehicle Identification Number"
+                                    value={vehicle.vin}
+                                    onChange={(e) => updateVehicleField('vin', e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <Label className="mb-2">Color</Label>
+                                <Input
+                                    placeholder="Vehicle Color"
+                                    value={vehicle.color}
+                                    onChange={(e) => updateVehicleField('color', e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <Label className="mb-2">Current Mileage</Label>
+                                <Input
+                                    type="number"
+                                    placeholder="Mileage in km/miles"
+                                    value={vehicle.mileage}
+                                    onChange={(e) => updateVehicleField('mileage', e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <Label className="mb-2">Purchase Date</Label>
+                                <Input
+                                    type="date"
+                                    value={vehicle.purchaseDate}
+                                    onChange={(e) => updateVehicleField('purchaseDate', e.target.value)}
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    <div className="mt-6">
-                        <Label className="mb-2">Description</Label>
-                        <Textarea
-                            placeholder="Vehicle Description"
-                            value={vehicle.description}
-                            onChange={(e) => updateVehicleField('description', e.target.value)}
-                        />
+                    <div className="mb-6">
+                        <h2 className="text-xl font-semibold mb-4">Insurance Information</h2>
+                        <div className="grid md:grid-cols-2 gap-6">
+                            <div>
+                                <Label className="mb-2">Insurance Provider</Label>
+                                <Input
+                                    placeholder="Insurance Company"
+                                    value={vehicle.insurance.provider}
+                                    onChange={(e) => updateInsuranceField('provider', e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <Label className="mb-2">Policy Number</Label>
+                                <Input
+                                    placeholder="Insurance Policy Number"
+                                    value={vehicle.insurance.policyNumber}
+                                    onChange={(e) => updateInsuranceField('policyNumber', e.target.value)}
+                                />
+                            </div>
+
+                            <div>
+                                <Label className="mb-2">Expiry Date</Label>
+                                <Input
+                                    type="date"
+                                    value={vehicle.insurance.expiryDate}
+                                    onChange={(e) => updateInsuranceField('expiryDate', e.target.value)}
+                                />
+                            </div>
+
+                            <div className="md:col-span-2">
+                                <Label className="mb-2">Insurance Details</Label>
+                                <Textarea
+                                    placeholder="Coverage details, special notes, etc."
+                                    value={vehicle.insurance.details}
+                                    onChange={(e) => updateInsuranceField('details', e.target.value)}
+                                />
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="mt-6">
-                        <Label className="mb-2">Features</Label>
-                        <div className="flex space-x-2 mb-4">
-                            <Input
-                                placeholder="Add a feature"
-                                value={newFeature}
-                                onChange={(e) => setNewFeature(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleAddFeature()}
+                    <div className="mb-6">
+                        <h2 className="text-xl font-semibold mb-4">Availability Status</h2>
+                        <div className="flex items-center space-x-2">
+                            <Switch
+                                checked={vehicle.isAvailable}
+                                onCheckedChange={(checked) => updateVehicleField('isAvailable', checked)}
                             />
-                            <Button onClick={handleAddFeature}>
-                                <Plus className="mr-2" /> Add
-                            </Button>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                            {vehicle.features.map(feature => (
-                                <Badge
-                                    key={feature}
-                                    variant="secondary"
-                                    className="flex items-center"
-                                >
-                                    {feature}
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="ml-2 w-4 h-4"
-                                        onClick={() => handleRemoveFeature(feature)}
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </Button>
-                                </Badge>
-                            ))}
+                            <Label>Available for booking</Label>
                         </div>
                     </div>
 
@@ -263,7 +298,7 @@ const VehicleManagement: React.FC = () => {
                         </Button>
                         <Button
                             onClick={handleSubmit}
-                            disabled={!vehicle.brand || !vehicle.model}
+                            disabled={!vehicle.modelId || !vehicle.registrationNumber || !vehicle.licensePlate}
                         >
                             <Save className="mr-2" /> Save Vehicle
                         </Button>
@@ -274,4 +309,4 @@ const VehicleManagement: React.FC = () => {
     );
 };
 
-export default VehicleManagement;
+export default AddVehicle;

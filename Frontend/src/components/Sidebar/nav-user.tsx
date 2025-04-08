@@ -30,6 +30,7 @@ import { logout } from "@/slices/authSlice"
 import { toast } from "sonner"
 import { Link, useNavigate } from "react-router"
 import { Button } from "../ui/button"
+import { useLogoutMutation } from "@/slices/authApiSlice"
 
 type User = {
   name: string
@@ -45,13 +46,23 @@ export function NavUser({
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { isMobile } = useSidebar()
+  const [logoutApi, { isLoading }] = useLogoutMutation();
+  
+  const handleLogout = async () => {
+    if (isLoading) return; 
 
-  const handleLogout = () => {
-    dispatch(logout());
-    toast.success("Logout Successfully");
-    navigate("/");
-  }
-
+    try {
+      await logoutApi({}).unwrap();
+      
+      dispatch(logout()); 
+      toast.success("Logged out successfully");
+      navigate("/");
+    } catch (err) {
+      console.error("Logout API failed:", err);
+      toast.error("Logout failed. Please try again.");
+    }
+  };
+  
   if (!user) {
     return (
       <SidebarMenu>
@@ -112,17 +123,19 @@ export function NavUser({
             <DropdownMenuSeparator />
             <Link to={'/u/profile'}>
               <DropdownMenuItem>
-                <BadgeCheck />
+                <BadgeCheck className="mr-2 h-4 w-4" />
                 Profile
               </DropdownMenuItem>
             </Link>
             <DropdownMenuSeparator />
-            <Button className="bg-white hover:bg-white text-black" onClick={handleLogout}>
-              <DropdownMenuItem>
-                <LogOut />
-                Log out
-              </DropdownMenuItem>
-            </Button>
+            <DropdownMenuItem 
+              onClick={handleLogout}
+              disabled={isLoading}
+              className="text-red-500 hover:text-red-700 cursor-pointer"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              {isLoading ? "Logging out..." : "Log out"}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

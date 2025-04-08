@@ -75,6 +75,7 @@ const ContactForm: React.FC = () => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    subject: "",
     message: ""
   });
 
@@ -217,6 +218,18 @@ const ContactForm: React.FC = () => {
                   placeholder="Enter your email" 
                   className="mt-1 block w-full"
                   value={formData.email}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div>
+                <Label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Subject
+                </Label>
+                <Input 
+                  id="subject" 
+                  placeholder="Title" 
+                  className="mt-1 block w-full"
+                  value={formData.subject}
                   onChange={handleInputChange}
                 />
               </div>
