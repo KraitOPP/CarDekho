@@ -1,5 +1,3 @@
-"use client"
-
 import { Button } from "@/components/ui/button";
 import {
     Form,
@@ -14,116 +12,165 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { useEffect, useState, useRef } from "react";
-import { Loader2, User, MapPin, Package, Lock, FileText, Upload } from "lucide-react";
+import { Loader2, User, MapPin, FileText, Lock, Upload, CreditCard, Shield } from "lucide-react";
 import { toast } from "sonner";
-import { 
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select";
+import { useGetProfileInfoQuery, useUpdateProfileMutation } from "@/slices/authApiSlice";
 
 export default function ProfilePage(){
-    const user = {}; 
+    const { data: userInfo, isLoading, isError } = useGetProfileInfoQuery({});
+    const [updateProfile, { isLoading: isUpdating }] = useUpdateProfileMutation();
     const [isEditing, setIsEditing] = useState(false);
     const [dlDocument, setDlDocument] = useState<File | null>(null);
-    const [identityDocument, setIdentityDocument] = useState<File | null>(null);
-
-    // Initialize form with default values
+    const [aadhaarDocument, setAadhaarDocument] = useState<File | null>(null);
+    
+    const user = userInfo?.user;
+    
     const form = useForm({
         defaultValues: {
-            firstName: "",
-            lastName: "",
-            phoneNumber: "",
+            name: "",
             email: "",
-            address: {
-                street: "",
-                city: "",
-                state: "",
-                country: "",
-                postalCode: ""
-            },
-            drivingLicense: {
-                number: "",
-            },
-            identityVerification: {
-                type: "",
-                number: "",
-            }
-        },
-    });
-
-    const passwordForm = useForm({
-        defaultValues: {
+            phone_number: "",
             oldPassword: "",
             newPassword: "",
             confirmNewPassword: "",
+            license_number: "",
+            address: {
+                house_no: "",
+                street: "",
+                area: "",
+                city: "",
+                state: "",
+                zip_code: "",
+                country: "",
+            },
         },
     });
 
-    // Only reset the form once when user data is available
     const formInitialized = useRef(false);
     
     useEffect(() => {
-        // Only reset if user data exists and form hasn't been initialized yet
         if (user && Object.keys(user).length > 0 && !formInitialized.current) {
-            form.reset(user);
+            form.reset({
+                name: user.name || "",
+                email: user.email || "",
+                phone_number: user.phone_number || "",
+                oldPassword: "",
+                newPassword: "",
+                confirmNewPassword: "",
+                license_number: user.license_number || "",
+                address: {
+                    house_no: user.house_no || "",
+                    street: user.street || "",
+                    area: user.area || "",
+                    city: user.city || "",
+                    state: user.state || "",
+                    zip_code: user.zip_code || "",
+                    country: user.country || "",
+                },
+            });
             formInitialized.current = true;
         }
     }, [user, form]);
 
     async function onSubmit(data: any) {
-        // Create a new object for submission to avoid modifying the form state directly
-        const submitData = {
-            ...data,
-            drivingLicense: {
-                ...data.drivingLicense,
-                documentFile: dlDocument
-            },
-            identityVerification: {
-                ...data.identityVerification,
-                documentFile: identityDocument
+        try {
+            if ((data.newPassword || data.confirmNewPassword) && data.newPassword !== data.confirmNewPassword) {
+                toast.warning("Passwords do not match",{
+                    description: "Please ensure the new passwords are identical."
+                });
+                return;
             }
-        };
-        
-        console.log("Submitting data:", submitData);
-        
-        // API call would go here
-        toast({ title: "Profile Updated Successfully" });
-        setIsEditing(false);
-    }
 
-    async function onPasswordSubmit(data: any) {
-        if (data.newPassword !== data.confirmNewPassword) {
-            toast({
-                title: "Passwords do not match",
-                description: "Please ensure the new passwords are identical.",
-                variant: "destructive",
+            const formData = new FormData();
+            
+            const permanentAddress = {
+                house_no: data.address.house_no,
+                street: data.address.street,
+                area: data.address.area,
+                city: data.address.city,
+                state: data.address.state,
+                zip_code: data.address.zip_code,
+                country: data.address.country
+            };
+
+            const updatePayload = {
+                email: data.email,
+                phoneNumber: data.phone_number,
+                licenseNumber: data.license_number,
+                permanentAddress,
+                temporaryAddress: null
+            };
+
+            if (data.oldPassword && data.newPassword) {
+                updatePayload.oldPassword = data.oldPassword;
+                updatePayload.newPassword = data.newPassword;
+            }
+
+            if (aadhaarDocument) {
+                const reader = new FileReader();
+                reader.readAsDataURL(aadhaarDocument);
+                reader.onload = async () => {
+                    const base64String = reader.result?.toString().split(',')[1];
+                    if (base64String) {
+                        updatePayload.aadhaarImage = base64String;
+                    }
+                };
+            }
+
+            if (dlDocument) {
+                const reader = new FileReader();
+                reader.readAsDataURL(dlDocument);
+                reader.onload = async () => {
+                    const base64String = reader.result?.toString().split(',')[1];
+                    if (base64String) {
+                        updatePayload.licenseImage = base64String;
+                    }
+                };
+            }
+
+            const result = await updateProfile(updatePayload).unwrap();
+            
+            toast.success("Profile Updated Successfully",{ 
+                description: result.message || "Your profile has been updated."
             });
-            return;
+            
+            setIsEditing(false);
+        } catch (err: any) {
+            toast.error("Update Failed",{ 
+                description: err.data?.error || "An error occurred while updating your profile."
+            });
         }
-        
-        console.log("Submitting password update:", data);
-        
-        // API call would go here
-        toast({ title: "Password Updated Successfully" });
-        passwordForm.reset();
     }
 
     const handleDLDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
             setDlDocument(e.target.files[0]);
-            toast({ title: "Driving License Document Selected", description: e.target.files[0].name });
+            toast("Driving License Document Selected",{ description: e.target.files[0].name });
         }
     };
 
-    const handleIdentityDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleAadhaarDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            setIdentityDocument(e.target.files[0]);
-            toast({ title: "Identity Document Selected", description: e.target.files[0].name });
+            setAadhaarDocument(e.target.files[0]);
+            toast("Aadhaar Document Selected",{description: e.target.files[0].name });
         }
     };
+
+    if(isLoading){
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <Loader2 className="animate-spin h-10 w-10 text-gray-600" />
+            </div>
+        );
+    }
+
+    if(isError){
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <p className="text-red-600">Failed to load profile information.</p>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen bg-gray-50 p-4 lg:p-8">
@@ -133,6 +180,7 @@ export default function ProfilePage(){
                     <Button
                         onClick={() => setIsEditing(!isEditing)}
                         variant={isEditing ? "destructive" : "outline"}
+                        disabled={isUpdating}
                     >
                         {isEditing ? "Cancel Editing" : "Edit Profile"}
                     </Button>
@@ -144,16 +192,17 @@ export default function ProfilePage(){
                             <User size={16} />
                             <span>Personal Info</span>
                         </TabsTrigger>
+                        <TabsTrigger value="security" className="space-x-2">
+                            <Shield size={16} />
+                            <span>Security</span>
+                        </TabsTrigger>
                         <TabsTrigger value="documents" className="space-x-2">
                             <FileText size={16} />
                             <span>Documents</span>
                         </TabsTrigger>
-                        <TabsTrigger value="security" className="space-x-2">
-                            <Lock size={16} />
-                            <span>Security</span>
-                        </TabsTrigger>
                     </TabsList>
 
+                    {/* Personal Information and Address */}
                     <TabsContent value="personal">
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -167,25 +216,12 @@ export default function ProfilePage(){
                                     <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                         <FormField
                                             control={form.control}
-                                            name="firstName"
+                                            name="name"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel>First Name</FormLabel>
+                                                    <FormLabel>Name</FormLabel>
                                                     <FormControl>
-                                                        <Input {...field} disabled={!isEditing} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="lastName"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Last Name</FormLabel>
-                                                    <FormControl>
-                                                        <Input {...field} disabled={!isEditing} />
+                                                        <Input {...field} disabled={!isEditing || isUpdating} />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -198,7 +234,7 @@ export default function ProfilePage(){
                                                 <FormItem>
                                                     <FormLabel>Email</FormLabel>
                                                     <FormControl>
-                                                        <Input {...field} type="email" disabled={!isEditing} />
+                                                        <Input {...field} type="email" disabled={!isEditing || isUpdating} />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -206,12 +242,12 @@ export default function ProfilePage(){
                                         />
                                         <FormField
                                             control={form.control}
-                                            name="phoneNumber"
+                                            name="phone_number"
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormLabel>Phone Number</FormLabel>
                                                     <FormControl>
-                                                        <Input {...field} type="tel" disabled={!isEditing} />
+                                                        <Input {...field} type="tel" disabled={!isEditing || isUpdating} />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -230,12 +266,38 @@ export default function ProfilePage(){
                                     <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                         <FormField
                                             control={form.control}
+                                            name="address.house_no"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>House Number</FormLabel>
+                                                    <FormControl>
+                                                        <Input {...field} disabled={!isEditing || isUpdating} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
                                             name="address.street"
                                             render={({ field }) => (
-                                                <FormItem className="col-span-2">
-                                                    <FormLabel>Street Address</FormLabel>
+                                                <FormItem>
+                                                    <FormLabel>Street</FormLabel>
                                                     <FormControl>
-                                                        <Input {...field} disabled={!isEditing} />
+                                                        <Input {...field} disabled={!isEditing || isUpdating} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="address.area"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Area</FormLabel>
+                                                    <FormControl>
+                                                        <Input {...field} disabled={!isEditing || isUpdating} />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -248,7 +310,7 @@ export default function ProfilePage(){
                                                 <FormItem>
                                                     <FormLabel>City</FormLabel>
                                                     <FormControl>
-                                                        <Input {...field} disabled={!isEditing} />
+                                                        <Input {...field} disabled={!isEditing || isUpdating} />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -261,7 +323,20 @@ export default function ProfilePage(){
                                                 <FormItem>
                                                     <FormLabel>State</FormLabel>
                                                     <FormControl>
-                                                        <Input {...field} disabled={!isEditing} />
+                                                        <Input {...field} disabled={!isEditing || isUpdating} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="address.zip_code"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Zip Code</FormLabel>
+                                                    <FormControl>
+                                                        <Input {...field} disabled={!isEditing || isUpdating} />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -274,20 +349,7 @@ export default function ProfilePage(){
                                                 <FormItem>
                                                     <FormLabel>Country</FormLabel>
                                                     <FormControl>
-                                                        <Input {...field} disabled={!isEditing} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="address.postalCode"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Postal Code</FormLabel>
-                                                    <FormControl>
-                                                        <Input {...field} disabled={!isEditing} />
+                                                        <Input {...field} disabled={!isEditing || isUpdating} />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -297,17 +359,123 @@ export default function ProfilePage(){
                                 </Card>
 
                                 {isEditing && (
-                                    <Button
-                                        type="submit"
-                                        className="w-full"
-                                    >
-                                        Save Changes
+                                    <Button type="submit" className="w-full" disabled={isUpdating}>
+                                        {isUpdating ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Saving Changes...
+                                            </>
+                                        ) : (
+                                            "Save Changes"
+                                        )}
                                     </Button>
                                 )}
                             </form>
                         </Form>
                     </TabsContent>
 
+                    {/* Security Tab - Now Separated */}
+                    <TabsContent value="security">
+                        <Form {...form}>
+                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center space-x-2">
+                                            <Lock size={20} />
+                                            <span>Password Management</span>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                        <FormField
+                                            control={form.control}
+                                            name="oldPassword"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Current Password</FormLabel>
+                                                    <FormControl>
+                                                        <Input {...field} type="password" disabled={!isEditing || isUpdating} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <div></div> {/* Empty div for grid alignment */}
+                                        <FormField
+                                            control={form.control}
+                                            name="newPassword"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>New Password</FormLabel>
+                                                    <FormControl>
+                                                        <Input {...field} type="password" disabled={!isEditing || isUpdating} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                        <FormField
+                                            control={form.control}
+                                            name="confirmNewPassword"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                    <FormLabel>Confirm New Password</FormLabel>
+                                                    <FormControl>
+                                                        <Input {...field} type="password" disabled={!isEditing || isUpdating} />
+                                                    </FormControl>
+                                                    <FormMessage />
+                                                </FormItem>
+                                            )}
+                                        />
+                                    </CardContent>
+                                </Card>
+
+                                {/* Security Tips Card */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center space-x-2">
+                                            <Shield size={20} />
+                                            <span>Security Recommendations</span>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <ul className="space-y-2 text-sm">
+                                            <li className="flex items-start">
+                                                <span className="mr-2 text-green-600">•</span>
+                                                <span>Use a strong password with at least 8 characters including numbers, uppercase, lowercase, and special characters</span>
+                                            </li>
+                                            <li className="flex items-start">
+                                                <span className="mr-2 text-green-600">•</span>
+                                                <span>Enable two-factor authentication for additional security</span>
+                                            </li>
+                                            <li className="flex items-start">
+                                                <span className="mr-2 text-green-600">•</span>
+                                                <span>Never share your password or security codes with anyone</span>
+                                            </li>
+                                            <li className="flex items-start">
+                                                <span className="mr-2 text-green-600">•</span>
+                                                <span>Update your password regularly (every 3-6 months)</span>
+                                            </li>
+                                        </ul>
+                                    </CardContent>
+                                </Card>
+
+                                {isEditing && (
+                                    <Button type="submit" className="w-full" disabled={isUpdating}>
+                                        {isUpdating ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Updating Security Settings...
+                                            </>
+                                        ) : (
+                                            "Update Security Settings"
+                                        )}
+                                    </Button>
+                                )}
+                            </form>
+                        </Form>
+                    </TabsContent>
+
+                    {/* Documents Tab for Driving License and Aadhaar */}
                     <TabsContent value="documents">
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -321,12 +489,12 @@ export default function ProfilePage(){
                                     <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                         <FormField
                                             control={form.control}
-                                            name="drivingLicense.number"
+                                            name="license_number"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel>Driving License Number</FormLabel>
+                                                    <FormLabel>License Number</FormLabel>
                                                     <FormControl>
-                                                        <Input {...field} disabled={!isEditing} />
+                                                        <Input {...field} disabled={!isEditing || isUpdating} />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -343,7 +511,7 @@ export default function ProfilePage(){
                                                             type="file"
                                                             className="hidden"
                                                             onChange={handleDLDocumentChange}
-                                                            disabled={!isEditing}
+                                                            disabled={!isEditing || isUpdating}
                                                             accept=".jpg,.jpeg,.png,.pdf"
                                                         />
                                                         {dlDocument ? (
@@ -353,7 +521,7 @@ export default function ProfilePage(){
                                                             </div>
                                                         ) : (
                                                             <div className="text-sm text-center text-muted-foreground">
-                                                                <label htmlFor="dlDocument" className={`cursor-pointer ${!isEditing ? 'pointer-events-none' : ''}`}>
+                                                                <label htmlFor="dlDocument" className={`cursor-pointer ${!isEditing || isUpdating ? 'pointer-events-none' : ''}`}>
                                                                     <span className="font-medium">Click to upload</span> or drag and drop
                                                                 </label>
                                                                 <p>PDF, JPG or PNG (max. 5MB)</p>
@@ -367,76 +535,37 @@ export default function ProfilePage(){
                                     </CardContent>
                                 </Card>
 
+                                {/* Aadhaar Card section */}
                                 <Card>
                                     <CardHeader>
                                         <CardTitle className="flex items-center space-x-2">
-                                            <FileText size={20} />
-                                            <span>Identity Verification</span>
+                                            <CreditCard size={20} />
+                                            <span>Aadhaar Card</span>
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                                        <FormField
-                                            control={form.control}
-                                            name="identityVerification.type"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>ID Document Type</FormLabel>
-                                                    <Select 
-                                                        disabled={!isEditing} 
-                                                        onValueChange={field.onChange} 
-                                                        value={field.value || undefined}
-                                                    >
-                                                        <FormControl>
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Select ID type" />
-                                                            </SelectTrigger>
-                                                        </FormControl>
-                                                        <SelectContent>
-                                                            <SelectItem value="aadhaar">Aadhaar Card</SelectItem>
-                                                            <SelectItem value="pan">PAN Card</SelectItem>
-                                                            <SelectItem value="voter">Voter ID</SelectItem>
-                                                            <SelectItem value="passport">Passport</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={form.control}
-                                            name="identityVerification.number"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>ID Number</FormLabel>
-                                                    <FormControl>
-                                                        <Input {...field} disabled={!isEditing} />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormItem className="col-span-2">
-                                            <FormLabel>Upload Identity Document</FormLabel>
+                                    <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-1">
+                                        <FormItem>
+                                            <FormLabel>Upload Aadhaar Card</FormLabel>
                                             <FormControl>
                                                 <div className={`border rounded-md border-input p-2 ${!isEditing ? 'bg-gray-100' : ''}`}>
                                                     <div className="flex items-center justify-center flex-col p-4">
                                                         <Upload className="h-8 w-8 text-muted-foreground mb-2" />
                                                         <Input
-                                                            id="identityDocument"
+                                                            id="aadhaarDocument"
                                                             type="file"
                                                             className="hidden"
-                                                            onChange={handleIdentityDocumentChange}
-                                                            disabled={!isEditing}
+                                                            onChange={handleAadhaarDocumentChange}
+                                                            disabled={!isEditing || isUpdating}
                                                             accept=".jpg,.jpeg,.png,.pdf"
                                                         />
-                                                        {identityDocument ? (
+                                                        {aadhaarDocument ? (
                                                             <div className="text-sm text-center">
-                                                                <p className="font-medium">{identityDocument.name}</p>
-                                                                <p className="text-muted-foreground">{(identityDocument.size / 1024).toFixed(2)} KB</p>
+                                                                <p className="font-medium">{aadhaarDocument.name}</p>
+                                                                <p className="text-muted-foreground">{(aadhaarDocument.size / 1024).toFixed(2)} KB</p>
                                                             </div>
                                                         ) : (
                                                             <div className="text-sm text-center text-muted-foreground">
-                                                                <label htmlFor="identityDocument" className={`cursor-pointer ${!isEditing ? 'pointer-events-none' : ''}`}>
+                                                                <label htmlFor="aadhaarDocument" className={`cursor-pointer ${!isEditing || isUpdating ? 'pointer-events-none' : ''}`}>
                                                                     <span className="font-medium">Click to upload</span> or drag and drop
                                                                 </label>
                                                                 <p>PDF, JPG or PNG (max. 5MB)</p>
@@ -451,72 +580,17 @@ export default function ProfilePage(){
                                 </Card>
 
                                 {isEditing && (
-                                    <Button
-                                        type="submit"
-                                        className="w-full"
-                                    >
-                                        Save Documents
+                                    <Button type="submit" className="w-full" disabled={isUpdating}>
+                                        {isUpdating ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Saving Documents...
+                                            </>
+                                        ) : (
+                                            "Save Documents"
+                                        )}
                                     </Button>
                                 )}
-                            </form>
-                        </Form>
-                    </TabsContent>
-
-                    <TabsContent value="security">
-                        <Form {...passwordForm}>
-                            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-6">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center space-x-2">
-                                            <Lock size={20} />
-                                            <span>Update Password</span>
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                                        <FormField
-                                            control={passwordForm.control}
-                                            name="oldPassword"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Old Password</FormLabel>
-                                                    <FormControl>
-                                                        <Input {...field} type="password" />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={passwordForm.control}
-                                            name="newPassword"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>New Password</FormLabel>
-                                                    <FormControl>
-                                                        <Input {...field} type="password" />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                        <FormField
-                                            control={passwordForm.control}
-                                            name="confirmNewPassword"
-                                            render={({ field }) => (
-                                                <FormItem>
-                                                    <FormLabel>Confirm New Password</FormLabel>
-                                                    <FormControl>
-                                                        <Input {...field} type="password" />
-                                                    </FormControl>
-                                                    <FormMessage />
-                                                </FormItem>
-                                            )}
-                                        />
-                                    </CardContent>
-                                </Card>
-                                <Button type="submit" className="w-full">
-                                    Update Password
-                                </Button>
                             </form>
                         </Form>
                     </TabsContent>

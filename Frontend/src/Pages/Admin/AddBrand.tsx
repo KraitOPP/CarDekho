@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
     Plus,
     Edit,
     Trash2,
     Save,
-    X
+    X,
+    Upload
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,32 +17,53 @@ import { Link } from 'react-router';
 interface Brand {
     id: number;
     name: string;
-    logoUrl: string;
+    image: string; // Base64 image or URL
 }
 
 const VehicleBrandManagement: React.FC = () => {
     const [brands, setBrands] = useState<Brand[]>([
-        { id: 1, name: 'Toyota', logoUrl: '/placeholder.svg' },
-        { id: 2, name: 'Ford', logoUrl: '/placeholder.svg' },
-        { id: 3, name: 'BMW', logoUrl: '/placeholder.svg' }
+        { id: 1, name: 'Toyota', image: '/placeholder.svg' },
+        { id: 2, name: 'Ford', image: '/placeholder.svg' },
+        { id: 3, name: 'BMW', image: '/placeholder.svg' }
     ]);
 
     const [newBrand, setNewBrand] = useState<Omit<Brand, 'id'>>({
         name: '',
-        logoUrl: ''
+        image: ''
     });
 
     const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const editFileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, isEditing: boolean = false) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64Image = reader.result as string;
+            if (isEditing && editingBrand) {
+                setEditingBrand({ ...editingBrand, image: base64Image });
+            } else {
+                setNewBrand({ ...newBrand, image: base64Image });
+            }
+        };
+        reader.readAsDataURL(file);
+    };
 
     const handleAddBrand = () => {
         if (newBrand.name.trim()) {
             const brandToAdd: Brand = {
                 ...newBrand,
                 id: brands.length + 1,
-                logoUrl: newBrand.logoUrl || '/placeholder.svg'
+                image: newBrand.image || '/placeholder.svg'
             };
             setBrands([...brands, brandToAdd]);
-            setNewBrand({ name: '', logoUrl: '' });
+            setNewBrand({ name: '', image: '' });
+            if (fileInputRef.current) {
+                fileInputRef.current.value = '';
+            }
         }
     };
 
@@ -55,11 +77,22 @@ const VehicleBrandManagement: React.FC = () => {
                 b.id === editingBrand.id ? editingBrand : b
             ));
             setEditingBrand(null);
+            if (editFileInputRef.current) {
+                editFileInputRef.current.value = '';
+            }
         }
     };
 
     const handleDeleteBrand = (id: number) => {
         setBrands(brands.filter(brand => brand.id !== id));
+    };
+
+    const triggerFileInput = (isEditing: boolean = false) => {
+        if (isEditing) {
+            editFileInputRef.current?.click();
+        } else {
+            fileInputRef.current?.click();
+        }
     };
 
     return (
@@ -70,7 +103,6 @@ const VehicleBrandManagement: React.FC = () => {
                     <Button variant="outline">
                         Back to Dashboard
                     </Button>
-
                 </Link>
             </div>
 
@@ -79,25 +111,46 @@ const VehicleBrandManagement: React.FC = () => {
                     <CardTitle>Add New Brand</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="flex space-x-4">
+                    <div className="flex flex-col md:flex-row md:space-x-4 space-y-4 md:space-y-0">
                         <div className="flex-grow">
                             <Label className="mb-2">Brand Name</Label>
                             <Input
                                 placeholder="Enter brand name"
                                 value={newBrand.name}
                                 onChange={(e) => setNewBrand({ ...newBrand, name: e.target.value })}
+                                className="mt-1"
                             />
                         </div>
                         <div className="flex-grow">
-                            <Label className="mb-2">Logo URL</Label>
-                            <Input
-                                placeholder="Optional logo URL"
-                                value={newBrand.logoUrl}
-                                onChange={(e) => setNewBrand({ ...newBrand, logoUrl: e.target.value })}
-                            />
+                            <Label className="mb-2">Brand Logo</Label>
+                            <div className="flex items-center mt-1">
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                    accept="image/*"
+                                    onChange={(e) => handleImageUpload(e)}
+                                />
+                                <Button 
+                                    variant="outline" 
+                                    onClick={() => triggerFileInput()}
+                                    className="flex items-center"
+                                >
+                                    <Upload className="mr-2 w-4 h-4" /> Upload Logo
+                                </Button>
+                                {newBrand.image && (
+                                    <div className="ml-4 w-10 h-10 relative">
+                                        <img
+                                            src={newBrand.image}
+                                            alt="Preview"
+                                            className="w-full h-full object-contain"
+                                        />
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         <div className="flex items-end">
-                            <Button onClick={handleAddBrand} className="mt-6">
+                            <Button onClick={handleAddBrand}>
                                 <Plus className="mr-2" /> Add Brand
                             </Button>
                         </div>
@@ -111,7 +164,7 @@ const VehicleBrandManagement: React.FC = () => {
                         <CardContent className="p-4 flex items-center justify-between">
                             <div className="flex items-center space-x-4">
                                 <img
-                                    src={brand.logoUrl}
+                                    src={brand.image}
                                     alt={`${brand.name} logo`}
                                     className="w-16 h-16 object-contain"
                                 />
@@ -154,17 +207,36 @@ const VehicleBrandManagement: React.FC = () => {
                                         ...editingBrand,
                                         name: e.target.value
                                     })}
+                                    className="mt-1"
                                 />
                             </div>
                             <div>
-                                <Label className="mb-2">Logo URL</Label>
-                                <Input
-                                    value={editingBrand.logoUrl}
-                                    onChange={(e) => setEditingBrand({
-                                        ...editingBrand,
-                                        logoUrl: e.target.value
-                                    })}
-                                />
+                                <Label className="mb-2">Brand Logo</Label>
+                                <div className="flex items-center mt-1">
+                                    <input
+                                        type="file"
+                                        ref={editFileInputRef}
+                                        className="hidden"
+                                        accept="image/*"
+                                        onChange={(e) => handleImageUpload(e, true)}
+                                    />
+                                    <Button 
+                                        variant="outline" 
+                                        onClick={() => triggerFileInput(true)}
+                                        className="flex items-center"
+                                    >
+                                        <Upload className="mr-2 w-4 h-4" /> Upload Logo
+                                    </Button>
+                                    {editingBrand.image && (
+                                        <div className="ml-4 w-10 h-10 relative">
+                                            <img
+                                                src={editingBrand.image}
+                                                alt="Preview"
+                                                className="w-full h-full object-contain"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                             <div className="flex justify-end space-x-2">
                                 <Button

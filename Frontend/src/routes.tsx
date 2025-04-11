@@ -19,6 +19,7 @@ import ContactManagement from "./Pages/Admin/ContactUsQueryManagement";
 import ContactUsManagement from "./Pages/Admin/ContactPageManagement";
 import BookingHistoryPage from "./Pages/User/BookingHistory";
 import ProfilePage from "./Pages/User/profile";
+import VehicleModelManagement from "./Pages/Admin/AddVehicleModel";
 
 export const router = createBrowserRouter([
   {
@@ -96,6 +97,10 @@ export const router = createBrowserRouter([
       {
           path: "contact-us/edit",
           element: <ContactUsManagement />
+      },
+      {
+          path: "vehicle-model",
+          element: <VehicleModelManagement />
       },
       {
           path: "vehicle",

@@ -31,7 +31,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { selectUser } from "@/slices/authSlice"
+import {  selectUser } from "@/slices/authSlice"
 import { useSelector } from "react-redux"
 
 type DropdownItem = {
@@ -105,6 +105,11 @@ export function AppSidebar(props: React.ComponentProps<typeof Sidebar>) {
             label: "Add Vehicle",
             icon: PlusCircle,
             onClick: () => navigate("/dashboard/vehicle")
+          },
+          {
+            label: "Add New Model",
+            icon: PlusCircle,
+            onClick: () => navigate("/dashboard/vehicle-model")
           },
           {
             label: "Manage Brands",

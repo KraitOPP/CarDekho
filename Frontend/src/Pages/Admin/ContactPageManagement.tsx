@@ -38,13 +38,6 @@ import { Label } from "@/components/ui/label";
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner"
 
-interface ContactLocation {
-  id: string;
-  address: string;
-  phone: string;
-  email: string;
-}
-
 interface WorkingHour {
   id: string;
   day: string;
@@ -64,7 +57,9 @@ interface ContactUsConfig {
   mainEmail: string;
   mainPhone: string;
   supportEmail: string;
-  locations: ContactLocation[];
+  address: string;
+  locationPhone: string;
+  locationEmail: string;
   workingHours: WorkingHour[];
   socialMedia: SocialMediaLink[];
   additionalInfo?: string;
@@ -76,14 +71,9 @@ const ContactUsManagement: React.FC = () => {
     mainEmail: 'contact@acmecorp.com',
     mainPhone: '+1 (555) 123-4567',
     supportEmail: 'support@acmecorp.com',
-    locations: [
-      {
-        id: '1',
-        address: '123 Business Street, Suite 100, Cityville, State 12345',
-        phone: '+1 (555) 987-6543',
-        email: 'headquarters@acmecorp.com'
-      }
-    ],
+    address: '123 Business Street, Suite 100, Cityville, State 12345',
+    locationPhone: '+1 (555) 987-6543',
+    locationEmail: 'headquarters@acmecorp.com',
     workingHours: [
       { id: '1', day: 'Monday', openTime: '09:00', closeTime: '17:00', isOpen: true },
       { id: '2', day: 'Tuesday', openTime: '09:00', closeTime: '17:00', isOpen: true },
@@ -101,15 +91,11 @@ const ContactUsManagement: React.FC = () => {
     additionalInfo: 'We are committed to providing excellent customer service.'
   });
 
-  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
   const [isWorkingHourModalOpen, setIsWorkingHourModalOpen] = useState(false);
   const [isSocialMediaModalOpen, setIsSocialMediaModalOpen] = useState(false);
-  const [deleteConfirmationType, setDeleteConfirmationType] = useState<'location' | 'workingHour' | 'socialMedia' | null>(null);
+  const [deleteConfirmationType, setDeleteConfirmationType] = useState<'workingHour' | 'socialMedia' | null>(null);
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
 
-  const [tempLocation, setTempLocation] = useState<ContactLocation>({
-    id: '', address: '', phone: '', email: ''
-  });
   const [tempWorkingHour, setTempWorkingHour] = useState<WorkingHour>({
     id: '', day: '', openTime: '', closeTime: '', isOpen: true
   });
@@ -117,36 +103,11 @@ const ContactUsManagement: React.FC = () => {
     id: '', platform: '', url: ''
   });
 
-  const updateMainConfig = (field: keyof ContactUsConfig, value: string) => {
+  const updateConfig = (field: keyof ContactUsConfig, value: string) => {
     setConfig(prev => ({
       ...prev,
       [field]: value
     }));
-  };
-
-  const handleLocationAction = () => {
-    const isEditing = tempLocation.id !== '';
-    
-    if (isEditing) {
-      setConfig(prev => ({
-        ...prev,
-        locations: prev.locations.map(loc => 
-          loc.id === tempLocation.id ? tempLocation : loc
-        )
-      }));
-    } else {
-      const newLocation = {
-        ...tempLocation,
-        id: `${config.locations.length + 1}`
-      };
-      setConfig(prev => ({
-        ...prev,
-        locations: [...prev.locations, newLocation]
-      }));
-    }
-
-    setIsLocationModalOpen(false);
-    setTempLocation({ id: '', address: '', phone: '', email: '' });
   };
 
   const handleWorkingHourAction = () => {
@@ -202,12 +163,6 @@ const ContactUsManagement: React.FC = () => {
   const handleDeleteItem = () => {
     if (deleteConfirmationType && deleteItemId) {
       switch (deleteConfirmationType) {
-        case 'location':
-          setConfig(prev => ({
-            ...prev,
-            locations: prev.locations.filter(loc => loc.id !== deleteItemId)
-          }));
-          break;
         case 'workingHour':
           setConfig(prev => ({
             ...prev,
@@ -233,6 +188,15 @@ const ContactUsManagement: React.FC = () => {
         toast({
           title: "Validation Error",
           description: "Company Name and Main Email are required.",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (!config.address || !config.locationPhone || !config.locationEmail) {
+        toast({
+          title: "Validation Error",
+          description: "Location address, phone, and email are required.",
           variant: "destructive"
         });
         return;
@@ -280,7 +244,7 @@ const ContactUsManagement: React.FC = () => {
             <Label className="block mb-2">Company Name</Label>
             <Input 
               value={config.companyName}
-              onChange={(e) => updateMainConfig('companyName', e.target.value)}
+              onChange={(e) => updateConfig('companyName', e.target.value)}
               placeholder="Enter company name"
             />
           </div>
@@ -288,7 +252,7 @@ const ContactUsManagement: React.FC = () => {
             <Label className="block mb-2">Main Email</Label>
             <Input 
               value={config.mainEmail}
-              onChange={(e) => updateMainConfig('mainEmail', e.target.value)}
+              onChange={(e) => updateConfig('mainEmail', e.target.value)}
               placeholder="Enter main contact email"
             />
           </div>
@@ -296,7 +260,7 @@ const ContactUsManagement: React.FC = () => {
             <Label className="block mb-2">Main Phone</Label>
             <Input 
               value={config.mainPhone}
-              onChange={(e) => updateMainConfig('mainPhone', e.target.value)}
+              onChange={(e) => updateConfig('mainPhone', e.target.value)}
               placeholder="Enter main phone number"
             />
           </div>
@@ -304,73 +268,49 @@ const ContactUsManagement: React.FC = () => {
             <Label className="block mb-2">Support Email</Label>
             <Input 
               value={config.supportEmail}
-              onChange={(e) => updateMainConfig('supportEmail', e.target.value)}
+              onChange={(e) => updateConfig('supportEmail', e.target.value)}
               placeholder="Enter support email"
-            />
-          </div>
-          <div className="md:col-span-2 space-y-2">
-            <Label className="block mb-2">Additional Information</Label>
-            <Textarea 
-              value={config.additionalInfo}
-              onChange={(e) => updateMainConfig('additionalInfo', e.target.value)}
-              placeholder="Optional additional contact information or message"
-              className="min-h-[120px]"
             />
           </div>
         </CardContent>
       </Card>
 
-      {/* Locations Management */}
+      {/* Single Location Card */}
       <Card>
-        <CardHeader className="flex-row justify-between items-center">
-          <CardTitle>Locations</CardTitle>
-          <Button 
-            onClick={() => {
-              setTempLocation({ id: '', address: '', phone: '', email: '' });
-              setIsLocationModalOpen(true);
-            }}
-          >
-            <Plus className="mr-2 w-4 h-4" /> Add Location
-          </Button>
+        <CardHeader>
+          <CardTitle>Office Location</CardTitle>
         </CardHeader>
-        <CardContent>
-          {config.locations.map((location) => (
-            <div key={location.id} className="border-b py-4 flex justify-between items-center">
-              <div>
-                <p className="font-semibold flex items-center">
-                  <MapPin className="mr-2 w-4 h-4" /> {location.address}
-                </p>
-                <p className="text-muted-foreground flex items-center">
-                  <Phone className="mr-2 w-4 h-4" /> {location.phone}
-                </p>
-                <p className="text-muted-foreground flex items-center">
-                  <Mail className="mr-2 w-4 h-4" /> {location.email}
-                </p>
-              </div>
-              <div className="flex space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    setTempLocation(location);
-                    setIsLocationModalOpen(true);
-                  }}
-                >
-                  <Edit className="w-4 h-4" />
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => {
-                    setDeleteConfirmationType('location');
-                    setDeleteItemId(location.id);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label className="flex items-center">
+              <MapPin className="mr-2 w-4 h-4" /> Address
+            </Label>
+            <Input 
+              value={config.address}
+              onChange={(e) => updateConfig('address', e.target.value)}
+              placeholder="Enter full address"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="flex items-center">
+              <Phone className="mr-2 w-4 h-4" /> Location Phone
+            </Label>
+            <Input 
+              value={config.locationPhone}
+              onChange={(e) => updateConfig('locationPhone', e.target.value)}
+              placeholder="Enter location phone number"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="flex items-center">
+              <Mail className="mr-2 w-4 h-4" /> Location Email
+            </Label>
+            <Input 
+              value={config.locationEmail}
+              onChange={(e) => updateConfig('locationEmail', e.target.value)}
+              placeholder="Enter location email address"
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -475,48 +415,23 @@ const ContactUsManagement: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Location Modal */}
-      <Dialog open={isLocationModalOpen} onOpenChange={setIsLocationModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{tempLocation.id ? 'Edit Location' : 'Add New Location'}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label>Address</Label>
-              <Input 
-                value={tempLocation.address}
-                onChange={(e) => setTempLocation(prev => ({...prev, address: e.target.value}))}
-                placeholder="Enter full address"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Phone</Label>
-              <Input 
-                value={tempLocation.phone}
-                onChange={(e) => setTempLocation(prev => ({...prev, phone: e.target.value}))}
-                placeholder="Enter phone number"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input 
-                value={tempLocation.email}
-                onChange={(e) => setTempLocation(prev => ({...prev, email: e.target.value}))}
-                placeholder="Enter email address"
-              />
-            </div>
+      {/* Additional Information Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Additional Information</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label className="block mb-2">Additional Information</Label>
+            <Textarea 
+              value={config.additionalInfo}
+              onChange={(e) => updateConfig('additionalInfo', e.target.value)}
+              placeholder="Optional additional contact information or message"
+              className="min-h-[120px]"
+            />
           </div>
-          <DialogFooter>
-            <Button 
-              onClick={handleLocationAction}
-              disabled={!tempLocation.address}
-            >
-              <Save className="mr-2 w-4 h-4" /> Save Location
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        </CardContent>
+      </Card>
 
       {/* Working Hours Modal */}
       <Dialog open={isWorkingHourModalOpen} onOpenChange={setIsWorkingHourModalOpen}>

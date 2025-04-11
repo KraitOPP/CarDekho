@@ -9,8 +9,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLoginMutation } from "@/slices/authApiSlice";
 import { toast } from "sonner";
-import { useNavigate, Link } from "react-router-dom";
-import { setCredentials } from '@/slices/authSlice';
+import { useNavigate, Link, redirect, replace } from "react-router-dom";
+import { refreshStore, setCredentials } from '@/slices/authSlice';
 import { useDispatch } from 'react-redux';
 
 const loginSchema = z.object({
@@ -40,8 +40,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       const res = await login(data).unwrap();
       dispatch(setCredentials(res));
       toast.success("Login Successful");
-      navigate("/"); // removed replace: true
-    } catch (error) {
+      window.location.href = "/";
+    } 
+    catch (error) {
       toast.error(error?.data?.error || "Login Failed: An unexpected error occurred.");
     }
   }

@@ -16,27 +16,26 @@ const authApiSlice = apiSlice.injectEndpoints({
                 body: data,
             })
         }),
-        sendVerifyCode : builder.mutation({
-            query: (data)=>({
-                url: "/auth/send-code",
-                method:"POST",
-                body: data,
+        getProfileInfo : builder.query({
+            query: ()=>({
+                url: "/user",
+                method:"GET",
             })
         }),
-        forgetPassword : builder.mutation({
+        updateProfile : builder.mutation({
             query: (data)=>({
-                url: "/auth/verify-code",
-                method:"POST",
+                url: "/user/update",
+                method:"PUT",
                 body: data,
             })
         }),
         logout : builder.mutation({
             query: ()=>({
-                url:"/auth/sign-out",
+                url:"/user/logout",
                 method:"POST",
             })
         })
     })
 });
 
-export const {useLoginMutation, useRegisterMutation,useSendVerifyCodeMutation,useForgetPasswordMutation, useLogoutMutation} = authApiSlice
+export const {useLoginMutation, useRegisterMutation, useUpdateProfileMutation, useLogoutMutation, useGetProfileInfoQuery} = authApiSlice

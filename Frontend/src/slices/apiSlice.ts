@@ -1,13 +1,12 @@
 import { fetchBaseQuery, createApi } from '@reduxjs/toolkit/query/react';
-import { logout } from './authSlice';
-import { error } from 'console';
+import { logout, setCredentials } from './authSlice';
 
 const SERVER_URL = import.meta.env.VITE_BACKEND_URL;
 
 const baseQuery = fetchBaseQuery({
   baseUrl: `${SERVER_URL}/api/`,
-  credentials: 'include', 
-  prepareHeaders: (headers, { getState }) => {
+  credentials: 'include',
+  prepareHeaders: (headers) => {
     const token = localStorage.getItem('accessToken');
     if (token) {
       headers.set('authorization', `Bearer ${token}`);
@@ -18,19 +17,29 @@ const baseQuery = fetchBaseQuery({
 
 const baseQueryWithReauth = async (args, api, extraOptions) => {
   let result = await baseQuery(args, api, extraOptions);
-  const errorMsg = result.error?.data?.error;
-  if (errorMsg=="Token expired" && result.error.status === 401) {
+
+  if (result.error && result.error.status === 401) {
+    console.warn('Access token expired, attempting refresh…', result.error);
+
     const refreshResult = await baseQuery(
-      { url: '/user/refresh', method: 'POST' },
+      { url: 'user/refresh', method: 'POST' },
       api,
       extraOptions
     );
 
     if (refreshResult.data) {
-      localStorage.setItem('accessToken', refreshResult.data.accessToken);
+      const newToken = (refreshResult.data as { accessToken: string }).accessToken;
+      const currentUser = api.getState().auth.userInfo;
+
+      api.dispatch(setCredentials({
+        userInfo: currentUser,
+        accessToken: newToken,
+      }));
+
       result = await baseQuery(args, api, extraOptions);
-    } 
-    else {
+
+    } else {
+      console.error('Refresh token invalid, logging out…', refreshResult.error);
       api.dispatch(logout());
     }
   }

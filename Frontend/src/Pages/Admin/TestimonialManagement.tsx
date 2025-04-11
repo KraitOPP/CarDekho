@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { 
-  Plus, 
-  Edit, 
   Trash2, 
-  MoreVertical
+  MoreVertical,
+  Mail,
+  User,
+  MessageSquare,
+  Plus,
+  Star,
+  StarHalf
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -30,20 +34,16 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger
+  AlertDialogTitle
 } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Link } from 'react-router';
 
 interface Testimonial {
   id: number;
   name: string;
-  position: string;
-  company: string;
+  email: string;
   content: string;
+  rating: number; // Rating out of 5
   isActive: boolean;
 }
 
@@ -52,24 +52,32 @@ const TestimonialManagement: React.FC = () => {
     {
       id: 1,
       name: 'John Doe',
-      position: 'CEO',
-      company: 'Tech Innovations Inc.',
+      email: 'john.doe@example.com',
       content: 'An incredible service that transformed our business operations.',
+      rating: 4.5,
       isActive: true
     },
     {
       id: 2,
       name: 'Jane Smith',
-      position: 'Marketing Director',
-      company: 'Global Solutions',
+      email: 'jane.smith@globalsolutions.com',
       content: 'Exceptional support and remarkable results.',
+      rating: 5,
       isActive: false
+    },
+    {
+      id: 3,
+      name: 'Robert Johnson',
+      email: 'robert.j@techcorp.com',
+      content: 'Good service but could improve response times.',
+      rating: 3.5,
+      isActive: true
     }
   ]);
 
-  const [editingTestimonial, setEditingTestimonial] = useState<Testimonial | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [testimonialToDelete, setTestimonialToDelete] = useState<Testimonial | null>(null);
+  const [viewTestimonial, setViewTestimonial] = useState<Testimonial | null>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
 
   const handleToggleStatus = (id: number) => {
     setTestimonials(testimonials.map(testimonial => 
@@ -86,53 +94,73 @@ const TestimonialManagement: React.FC = () => {
     }
   };
 
-
-  const handleEditTestimonial = (testimonial: Testimonial) => {
-    setEditingTestimonial({...testimonial});
-    setIsDialogOpen(true);
+  const handleViewDetails = (testimonial: Testimonial) => {
+    setViewTestimonial({...testimonial});
+    setIsViewDialogOpen(true);
   };
 
-  const handleSaveTestimonial = () => {
-    if (!editingTestimonial) return;
-
-    if (editingTestimonial.id && testimonials.some(t => t.id === editingTestimonial.id)) {
-      setTestimonials(testimonials.map(t => 
-        t.id === editingTestimonial.id ? editingTestimonial : t
-      ));
-    } else {
-      setTestimonials([...testimonials, editingTestimonial]);
+  // Function to render star rating
+  const renderStarRating = (rating: number) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 !== 0;
+    
+    // Add full stars
+    for (let i = 0; i < fullStars; i++) {
+      stars.push(
+        <Star 
+          key={`star-${i}`} 
+          className="w-4 h-4 fill-yellow-400 text-yellow-400" 
+        />
+      );
     }
-
-    setIsDialogOpen(false);
-    setEditingTestimonial(null);
-  };
-
-  const handleInputChange = (field: keyof Testimonial, value: string | boolean) => {
-    if (editingTestimonial) {
-      setEditingTestimonial({
-        ...editingTestimonial,
-        [field]: value
-      });
+    
+    // Add half star if needed
+    if (hasHalfStar) {
+      stars.push(
+        <StarHalf 
+          key="half-star" 
+          className="w-4 h-4 fill-yellow-400 text-yellow-400" 
+        />
+      );
     }
+    
+    // Add empty stars
+    const emptyStars = 5 - Math.ceil(rating);
+    for (let i = 0; i < emptyStars; i++) {
+      stars.push(
+        <Star 
+          key={`empty-star-${i}`} 
+          className="w-4 h-4 text-gray-300" 
+        />
+      );
+    }
+    
+    return (
+      <div className="flex items-center">
+        <div className="flex mr-1">{stars}</div>
+        <span className="text-sm text-muted-foreground">({rating})</span>
+      </div>
+    );
   };
 
   return (
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Testimonial Management</h1>
-        <Link to={'/testimonial/add-new'}>
-        <Button>
-          <Plus className="mr-2" /> Add New Testimonial
-        </Button>
+        <Link to="/testimonial/add-new">
+          <Button>
+            <Plus className="mr-2" /> Add New Testimonial
+          </Button>
         </Link>
       </div>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {testimonials.map((testimonial) => (
-          <Card key={testimonial.id}>
+          <Card key={testimonial.id} className="shadow-sm">
             <CardHeader className="pb-2">
               <div className="flex justify-between items-center">
-                <CardTitle>{testimonial.name}</CardTitle>
+                <CardTitle className="text-lg">{testimonial.name}</CardTitle>
                 <Badge 
                   variant={testimonial.isActive ? 'default' : 'secondary'}
                   className="flex items-center"
@@ -140,12 +168,15 @@ const TestimonialManagement: React.FC = () => {
                   {testimonial.isActive ? 'Active' : 'Inactive'}
                 </Badge>
               </div>
-              <p className="text-sm text-muted-foreground">
-                {testimonial.position} at {testimonial.company}
+              <p className="text-sm text-muted-foreground flex items-center">
+                <Mail className="mr-1 w-4 h-4" /> {testimonial.email}
               </p>
+              <div className="mt-1">
+                {renderStarRating(testimonial.rating)}
+              </div>
             </CardHeader>
             <CardContent>
-              <p className="mb-4 text-sm">{testimonial.content}</p>
+              <p className="mb-4 text-sm line-clamp-3">{testimonial.content}</p>
               
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-2">
@@ -164,11 +195,11 @@ const TestimonialManagement: React.FC = () => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem 
-                      onSelect={() => handleEditTestimonial(testimonial)}
+                      onSelect={() => handleViewDetails(testimonial)}
                       className="cursor-pointer"
                     >
-                      <Edit className="mr-2 w-4 h-4" />
-                      Edit
+                      <MessageSquare className="mr-2 w-4 h-4" />
+                      View Details
                     </DropdownMenuItem>
                     <DropdownMenuItem 
                       onSelect={() => setTestimonialToDelete(testimonial)}
@@ -185,84 +216,59 @@ const TestimonialManagement: React.FC = () => {
         ))}
       </div>
 
-      {/* Edit/Add Dialog */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      {/* View Details Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>
-              {editingTestimonial?.id ? 'Edit' : 'Add'} Testimonial
-            </DialogTitle>
+            <DialogTitle>Testimonial Details</DialogTitle>
           </DialogHeader>
           
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
-                Name
-              </Label>
-              <Input 
-                id="name" 
-                value={editingTestimonial?.name || ''} 
-                className="col-span-3"
-                onChange={(e) => handleInputChange('name', e.target.value)}
-              />
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-2">
+              <User className="w-5 h-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Name</p>
+                <p>{viewTestimonial?.name}</p>
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="position" className="text-right">
-                Position
-              </Label>
-              <Input 
-                id="position" 
-                value={editingTestimonial?.position || ''} 
-                className="col-span-3"
-                onChange={(e) => handleInputChange('position', e.target.value)}
-              />
+            
+            <div className="flex items-center gap-2">
+              <Mail className="w-5 h-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Email</p>
+                <p>{viewTestimonial?.email}</p>
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="company" className="text-right">
-                Company
-              </Label>
-              <Input 
-                id="company" 
-                value={editingTestimonial?.company || ''} 
-                className="col-span-3"
-                onChange={(e) => handleInputChange('company', e.target.value)}
-              />
+
+            <div className="flex items-center gap-2">
+              <Star className="w-5 h-5 text-muted-foreground" />
+              <div>
+                <p className="text-sm font-medium">Rating</p>
+                {viewTestimonial && renderStarRating(viewTestimonial.rating)}
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="content" className="text-right">
-                Content
-              </Label>
-              <Textarea 
-                id="content" 
-                value={editingTestimonial?.content || ''} 
-                className="col-span-3"
-                onChange={(e) => handleInputChange('content', e.target.value)}
-              />
+            
+            <div className="flex items-start gap-2">
+              <MessageSquare className="w-5 h-5 text-muted-foreground mt-1" />
+              <div>
+                <p className="text-sm font-medium">Content</p>
+                <p className="whitespace-pre-wrap">{viewTestimonial?.content}</p>
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="isActive" className="text-right">
-                Active
-              </Label>
-              <Switch
-                id="isActive"
-                checked={editingTestimonial?.isActive || false}
-                onCheckedChange={(checked) => 
-                  handleInputChange('isActive', checked)
-                }
-              />
+            
+            <div className="flex items-center gap-2">
+              <Badge variant={viewTestimonial?.isActive ? 'default' : 'secondary'}>
+                {viewTestimonial?.isActive ? 'Active' : 'Inactive'}
+              </Badge>
             </div>
           </div>
           
           <DialogFooter>
             <Button 
               type="button" 
-              variant="outline" 
-              onClick={() => setIsDialogOpen(false)}
+              onClick={() => setIsViewDialogOpen(false)}
             >
-              Cancel
-            </Button>
-            <Button type="submit" onClick={handleSaveTestimonial}>
-              Save
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -277,7 +283,7 @@ const TestimonialManagement: React.FC = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the testimonial for {testimonialToDelete?.name} from {testimonialToDelete?.company}.
+              This will permanently delete the testimonial from {testimonialToDelete?.name}.
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
