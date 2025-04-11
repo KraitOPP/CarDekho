@@ -106,7 +106,11 @@ async function deleteBrand(req, res) {
     const brandRows = await connection.query(`SELECT brand_logo FROM vehicle_brands WHERE id = ?`, [brandId]);
     const brandLogo = brandRows[0][0]?.brand_logo;
 
+    // Delete vehicles linked to brand
     await connection.query(`DELETE FROM vehicles WHERE brand_id = ?`, [brandId]);
+
+    // Delete models linked to brand
+    await connection.query(`DELETE FROM vehicle_models WHERE brand_id = ?`, [brandId]);
 
     const [brandResult] = await connection.query(`DELETE FROM vehicle_brands WHERE id = ?`, [brandId]);
 
@@ -118,10 +122,10 @@ async function deleteBrand(req, res) {
     if (brandLogo) await deleteFromCloudinary(brandLogo);
 
     await connection.commit();
-    return res.status(200).json({ message: 'Brand and associated vehicles deleted successfully' });
+    return res.status(200).json({ message: 'Brand, models, and associated vehicles deleted successfully' });
   } catch (error) {
     if (connection) await connection.rollback();
-    console.error('Error deleting brand and vehicles:', error);
+    console.error('Error deleting brand:', error);
     return res.status(500).json({ error: 'Internal Server Error' });
   } finally {
     if (connection) connection.release();

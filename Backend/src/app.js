@@ -9,8 +9,8 @@ const {router:vehicleRouter}=require('./routes/vehicleRouter.js');
 const {router:bookingRouter}=require('./routes/bookingRouter.js');
 const {router:testimonialRouter}=require('./routes/testimonialRouter.js');
 const {router:contactRouter}=require('./routes/contactRouter.js');
-const {router:subscriberRouter}=require('./routes/subscriberRouter.js')
-
+const {router:subscriberRouter}=require('./routes/subscriberRouter.js');
+const {router:vehicleModelRouter}=require('./routes/vehicleModel.js');
 app.use(cors({
     origin:process.env.CORS_ORIGIN,
     credentials:true
@@ -23,6 +23,7 @@ app.use(express.static("public"))
 app.use(cookieParser())
 app.use("/api/user",userRouter)
 app.use("/api/brand",brandRouter)
+app.use("/api/vehicle-model",vehicleModelRouter)
 app.use("/api/vehicle",vehicleRouter)
 app.use("/api/booking",bookingRouter)
 app.use("/api/testimonial",testimonialRouter)

@@ -4,12 +4,40 @@ const { uploadOnCloudinary, deleteFromCloudinary } = require('../middlewares/clo
 // Add a new vehicle
 async function addVehicle(req, res) {
     try {
-        const { brand_id, model, registration_no, type, price_per_day, description, status } = req.body;
+        const {
+            model_id,
+            registration_no,
+            plate_number,
+            color,
+            availability_status,
+            current_mileage,
+            purchase_date,
+            insurance_provider,
+            insurance_policy_number,
+            insurance_expiry_date,
+            insurance_detail 
+        } = req.body;
         const images = req.files;
 
-        // Insert vehicle details into database
-        const vehicleQuery = `INSERT INTO vehicles (brand_id, model, registration_no, type, price_per_day, description, status) VALUES (?, ?, ?, ?, ?, ?, ?)`;
-        const result = await executeQuery(vehicleQuery, [brand_id, model, registration_no, type, price_per_day, description, status]);
+       
+        const vehicleQuery = `
+            INSERT INTO vehicles 
+            (model_id, registration_no, plate_number, color, availability_status, current_mileage, purchase_date, insurance_provider, insurance_policy_number, insurance_expiry_date, insurance_detail)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        const result = await executeQuery(vehicleQuery, [
+            model_id,
+            registration_no,
+            plate_number,
+            color,
+            availability_status,
+            current_mileage,
+            purchase_date,
+            insurance_provider,
+            insurance_policy_number,
+            insurance_expiry_date,
+            insurance_detail
+        ]);
 
         const vehicle_id = result.insertId;
 
@@ -28,7 +56,7 @@ async function addVehicle(req, res) {
     }
 }
 
-// Get a vehicle by ID
+
 async function getVehicle(req, res) {
     try {
         const { id } = req.params;
@@ -70,28 +98,57 @@ async function getAllVehicle(req, res) {
 async function updateVehicle(req, res) {
     try {
         const { id } = req.params;
-        const { brand_id, model, registration_no, type, price_per_day, description, status } = req.body;
+        const {
+            model_id,
+            registration_no,
+            plate_number,
+            color,
+            availability_status,
+            current_mileage,
+            purchase_date,
+            insurance_provider,
+            insurance_policy_number,
+            insurance_expiry_date,
+            insurance_detail  
+        } = req.body;
         const images = req.files;
 
-        // Fetch the current vehicle data to check existing values
+        // Fetch the current vehicle data
         const currentVehicle = await executeQuery(`SELECT * FROM vehicles WHERE id=?`, [id]);
         if (currentVehicle.length === 0) {
             return res.status(404).json({ message: 'Vehicle not found' });
         }
 
-        // Use coalesce-like logic to keep the existing value if a field is not provided
-        const updatedBrandId = brand_id || currentVehicle[0].brand_id;
-        const updatedModel = model || currentVehicle[0].model;
+        // Use coalesce-like logic to retain existing values if not provided
+        const updatedModelId = model_id || currentVehicle[0].model_id;
         const updatedRegistrationNo = registration_no || currentVehicle[0].registration_no;
-        const updatedType = type || currentVehicle[0].type;
-        const updatedPricePerDay = price_per_day || currentVehicle[0].price_per_day;
-        const updatedDescription = description || currentVehicle[0].description;
-        const updatedStatus = status || currentVehicle[0].status;
+        const updatedPlateNumber = plate_number || currentVehicle[0].plate_number;
+        const updatedColor = color || currentVehicle[0].color;
+        const updatedAvailabilityStatus = availability_status || currentVehicle[0].availability_status;
+        const updatedCurrentMileage = current_mileage || currentVehicle[0].current_mileage;
+        const updatedPurchaseDate = purchase_date || currentVehicle[0].purchase_date;
+        const updatedInsuranceProvider = insurance_provider || currentVehicle[0].insurance_provider;
+        const updatedInsurancePolicyNumber = insurance_policy_number || currentVehicle[0].insurance_policy_number;
+        const updatedInsuranceExpiryDate = insurance_expiry_date || currentVehicle[0].insurance_expiry_date;
+        const updatedInsuranceDetail = insurance_detail || currentVehicle[0].insurance_detail;
 
-        // Update query using the coalesced values
+        // Update vehicle data
         await executeQuery(
-            `UPDATE vehicles SET brand_id=?, model=?, registration_no=?, type=?, price_per_day=?, description=?, status=?, updated_at=NOW() WHERE id=?`,
-            [updatedBrandId, updatedModel, updatedRegistrationNo, updatedType, updatedPricePerDay, updatedDescription, updatedStatus, id]
+            `UPDATE vehicles SET model_id=?, registration_no=?, plate_number=?, color=?, availability_status=?, current_mileage=?, purchase_date=?, insurance_provider=?, insurance_policy_number=?, insurance_expiry_date=?, insurance_detail=?, updated_at=NOW() WHERE id=?`,
+            [
+                updatedModelId,
+                updatedRegistrationNo,
+                updatedPlateNumber,
+                updatedColor,
+                updatedAvailabilityStatus,
+                updatedCurrentMileage,
+                updatedPurchaseDate,
+                updatedInsuranceProvider,
+                updatedInsurancePolicyNumber,
+                updatedInsuranceExpiryDate,
+                updatedInsuranceDetail,
+                id
+            ]
         );
 
         // Handle image uploads and removals
@@ -123,7 +180,6 @@ async function deleteVehicle(req, res) {
         const { id } = req.params;
 
         const images = await executeQuery(`SELECT image_path FROM vehicle_images WHERE vehicle_id=?`, [id]);
-
         for (const image of images) {
             await deleteFromCloudinary(image.image_path);
         }
