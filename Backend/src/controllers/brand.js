@@ -1,27 +1,38 @@
-
-
 const { executeQuery, pool } = require('../db/db.js');
+const { uploadOnCloudinary, deleteFromCloudinary } = require('../middlewares/cloudinary.js');
 
-async function addBrand(req,res) {
+// Add a new brand with optional logo
+async function addBrand(req, res) {
   try {
     const { brand_name } = req.body;
+    const logoFile = req.files?.brand_logo?.[0];
+
     if (!brand_name) {
       return res.status(400).json({ error: 'Brand name is required' });
     }
 
+    let logoUrl = null;
+    if (logoFile) {
+      logoUrl = await uploadOnCloudinary(logoFile.path);
+    }
+
     const result = await executeQuery(
-      `INSERT INTO vehicle_brands (brand_name) VALUES (?)`,
-      [brand_name]
+      `INSERT INTO vehicle_brands (brand_name, brand_logo) VALUES (?, ?)`,
+      [brand_name, logoUrl]
     );
-    
-    return res.status(201).json({ message: 'Brand created successfully', brand_id: result.insertId });
+
+    return res.status(201).json({
+      message: 'Brand created successfully',
+      brand_id: result.insertId,
+    });
   } catch (error) {
     console.error('Error adding brand:', error);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
-};
+}
 
-async function getBrands(req,res)  {
+// Get all brands
+async function getBrands(req, res) {
   try {
     const brands = await executeQuery(`SELECT * FROM vehicle_brands`);
     return res.status(200).json({ brands });
@@ -29,10 +40,10 @@ async function getBrands(req,res)  {
     console.error('Error retrieving brands:', error);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
-};
+}
 
-
-async function getBrandById(req,res)  {
+// Get brand by ID
+async function getBrandById(req, res) {
   try {
     const brandId = req.params.id;
     const rows = await executeQuery(
@@ -47,67 +58,75 @@ async function getBrandById(req,res)  {
     console.error('Error fetching brand:', error);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
-};
+}
 
-
-async function updateBrand(req,res)  {
+// Update brand name and/or logo
+async function updateBrand(req, res) {
   try {
     const brandId = req.params.id;
     const { brand_name } = req.body;
-    
-    if (!brand_name) {
-      return res.status(400).json({ error: 'Brand name is required' });
+    const logoFile = req.files?.brand_logo?.[0];
+
+    if (!brand_name && !logoFile) {
+      return res.status(400).json({ error: 'Nothing to update' });
     }
-    
-    const result = await executeQuery(
-      `UPDATE vehicle_brands SET brand_name = ? WHERE id = ?`,
-      [brand_name, brandId]
-    );
-    
-    if (result.affectedRows === 0) {
+
+    const existing = await executeQuery(`SELECT * FROM vehicle_brands WHERE id = ?`, [brandId]);
+    if (existing.length === 0) {
       return res.status(404).json({ error: 'Brand not found' });
     }
-    
+
+    let logoUrl = existing[0].brand_logo;
+
+    if (logoFile) {
+      if (logoUrl) await deleteFromCloudinary(logoUrl);
+      logoUrl = await uploadOnCloudinary(logoFile.path);
+    }
+
+    const result = await executeQuery(
+      `UPDATE vehicle_brands SET brand_name = ?, brand_logo = ? WHERE id = ?`,
+      [brand_name || existing[0].brand_name, logoUrl, brandId]
+    );
+
     return res.status(200).json({ message: 'Brand updated successfully' });
   } catch (error) {
     console.error('Error updating brand:', error);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
-};
+}
 
-
-async function deleteBrand(req,res)  {
+// Delete brand and associated vehicles
+async function deleteBrand(req, res) {
   const brandId = req.params.id;
   let connection;
   try {
     connection = await pool.getConnection();
     await connection.beginTransaction();
-    await connection.query(
-      `DELETE FROM vehicles WHERE brand_id = ?`,
-      [brandId]
-    );
-    
 
-    const [brandResult] = await connection.query(
-      `DELETE FROM vehicle_brands WHERE id = ?`,
-      [brandId]
-    );
-    
+    const brandRows = await connection.query(`SELECT brand_logo FROM vehicle_brands WHERE id = ?`, [brandId]);
+    const brandLogo = brandRows[0][0]?.brand_logo;
+
+    await connection.query(`DELETE FROM vehicles WHERE brand_id = ?`, [brandId]);
+
+    const [brandResult] = await connection.query(`DELETE FROM vehicle_brands WHERE id = ?`, [brandId]);
+
     if (brandResult.affectedRows === 0) {
       await connection.rollback();
       return res.status(404).json({ error: 'Brand not found or already deleted' });
     }
-    
+
+    if (brandLogo) await deleteFromCloudinary(brandLogo);
+
     await connection.commit();
     return res.status(200).json({ message: 'Brand and associated vehicles deleted successfully' });
   } catch (error) {
     if (connection) await connection.rollback();
-    console.error('Error deleting brand and associated vehicles:', error);
+    console.error('Error deleting brand and vehicles:', error);
     return res.status(500).json({ error: 'Internal Server Error' });
   } finally {
     if (connection) connection.release();
   }
-};
+}
 
 module.exports = {
   addBrand,
