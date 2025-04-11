@@ -1,4 +1,4 @@
-const executeQuery = require('../db/db.js');
+const {executeQuery} = require('../db/db.js');
 
 async function addTestimonial(req, res) {
     try {
@@ -16,6 +16,7 @@ async function addTestimonial(req, res) {
 async function getOwnTestimonials(req, res) {
     try {
         const user_id = req.user.id;
+        console.log(user_id);
 
         const testimonials = await executeQuery(
             `SELECT id, content, status, created_at FROM testimonials WHERE user_id = ?`, 
@@ -30,19 +31,36 @@ async function getOwnTestimonials(req, res) {
 
 async function getActiveTestimonials(req, res) {
     try {
-        const testimonials = await executeQuery(`SELECT t.id, t.content, u.name FROM testimonials t JOIN users u ON t.user_id = u.id WHERE t.status='active'`);
+        const query = `SELECT t.id, t.content, u.name 
+                       FROM testimonials t 
+                       JOIN users u ON t.user_id = u.id 
+                       WHERE t.status = ?`;
+
+        const params = ['active']; // Ensure this is an array and not undefined
+
+        console.log('Executing SQL:', query);
+        console.log('Parameters:', params);
+
+        const testimonials = await executeQuery(query, params);
 
         res.status(200).json(testimonials);
     } catch (error) {
+        console.error('Database Error:', error.message);
         res.status(500).json({ error: error.message });
     }
 }
-
 async function getTestimonialById(req, res) {
     try {
         const { id } = req.params;
 
-        const testimonial = await executeQuery(`SELECT t.id, t.content, t.status, u.name FROM testimonials t JOIN users u ON t.user_id = u.id WHERE t.id = ?`, [id]);
+        const query = `
+            SELECT t.id, t.content, t.status, u.name 
+            FROM testimonials t 
+            JOIN users u ON t.user_id = u.id 
+            WHERE t.id = ?
+        `;
+
+        const testimonial = await executeQuery(query, [id]);
 
         if (testimonial.length === 0) {
             return res.status(404).json({ message: "Testimonial not found" });
@@ -53,6 +71,7 @@ async function getTestimonialById(req, res) {
         res.status(500).json({ error: error.message });
     }
 }
+
 
 async function updateTestimonial(req, res) {
     try {

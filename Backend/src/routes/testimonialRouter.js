@@ -6,7 +6,7 @@ const { isAdmin } = require('../middlewares/isAdmin.js');
 
 
 router.post('/add-testimonial', verifyJWT, addTestimonial); 
-router.get('/view-testimonial', verifyJWT,getTestimonialById); 
+router.get('/view-testimonial/:id', verifyJWT,getTestimonialById); 
 router.get('/my-testimonials', verifyJWT, getOwnTestimonials); 
 router.get('/active-testimonials', getActiveTestimonials); 
 router.put('/update-testimonial/:id', verifyJWT, updateTestimonial); 
