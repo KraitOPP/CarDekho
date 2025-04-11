@@ -4,14 +4,14 @@ const { executeQuery } = require('../db/db.js');
 const verifyJWT = async (req, res, next) => {
   try {
     let token = req.body.token || req.headers.authorization;
-    if (!token) {
+    if (!token){
       return res.status(401).json({
         success: false,
         message: "UnAuthenticated",
       });
     }
 
-    if (token.startsWith("Bearer ")) {
+    if (token.startsWith("Bearer ")){
       token = token.slice(7, token.length).trim();
     }
     
@@ -24,7 +24,7 @@ const verifyJWT = async (req, res, next) => {
     
     req.user = users[0];
     next();
-  } catch (error) {
+  } catch (error){
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({ message: 'Token expired' });
     }

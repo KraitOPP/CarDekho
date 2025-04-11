@@ -97,7 +97,6 @@ async function refresh(req, res) {
   if (!refreshToken) {
     return res.status(401).json({ error: 'Refresh token is required.' });
   }
-
   try {
     const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET);
     const userId = decoded.id;

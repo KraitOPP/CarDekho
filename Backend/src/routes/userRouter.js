@@ -11,12 +11,11 @@ router.post('/signup', signup);
 router.post('/signin', login);
 router.post('/refresh', refresh);
 router.post('/logout', verifyJWT, logout);
-// router.put('/update', verifyJWT, updateProfile);
 router.put('/update', verifyJWT, upload.fields([
     { name: 'aadhaar_image', maxCount: 1 },
     { name: 'license_image', maxCount: 1 }
   ]), updateProfile);
-router.put('update-password',verifyJWT,updatePassword)
+router.put('/update-password',verifyJWT,updatePassword)
 router.get('/all', verifyJWT,isAdmin, getAllUsers);
 
 module.exports = { router };

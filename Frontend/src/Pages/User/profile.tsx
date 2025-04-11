@@ -12,27 +12,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useForm } from "react-hook-form";
 import { useEffect, useState, useRef } from "react";
-import { Loader2, User, MapPin, FileText, Lock, Upload, CreditCard, Shield } from "lucide-react";
+import { Loader2, User, MapPin, FileText, Lock, Upload, CreditCard, Shield, Eye } from "lucide-react";
 import { toast } from "sonner";
-import { useGetProfileInfoQuery, useUpdateProfileMutation } from "@/slices/authApiSlice";
+import { 
+  useGetProfileInfoQuery, 
+  useUpdateProfileMutation,
+  useUpdatePasswordMutation 
+} from "@/slices/authApiSlice";
 
 export default function ProfilePage(){
     const { data: userInfo, isLoading, isError } = useGetProfileInfoQuery({});
     const [updateProfile, { isLoading: isUpdating }] = useUpdateProfileMutation();
+    const [updatePassword, { isLoading: isUpdatingPassword }] = useUpdatePasswordMutation();
     const [isEditing, setIsEditing] = useState(false);
-    const [dlDocument, setDlDocument] = useState<File | null>(null);
-    const [aadhaarDocument, setAadhaarDocument] = useState<File | null>(null);
+    const [dlDocument, setDlDocument] = useState(null);
+    const [aadhaarDocument, setAadhaarDocument] = useState(null);
+    const [previewDl, setPreviewDl] = useState(null);
+    const [previewAadhaar, setPreviewAadhaar] = useState(null);
     
-    const user = userInfo?.user;
-    
-    const form = useForm({
+    const user = userInfo?.userInfo;
+    const profileForm = useForm({
         defaultValues: {
             name: "",
             email: "",
             phone_number: "",
-            oldPassword: "",
-            newPassword: "",
-            confirmNewPassword: "",
             license_number: "",
             address: {
                 house_no: "",
@@ -46,115 +49,173 @@ export default function ProfilePage(){
         },
     });
 
+    const passwordForm = useForm({
+        defaultValues: {
+            oldPassword: "",
+            newPassword: "",
+            confirmNewPassword: "",
+        },
+    });
+
     const formInitialized = useRef(false);
     
     useEffect(() => {
         if (user && Object.keys(user).length > 0 && !formInitialized.current) {
-            form.reset({
+            profileForm.reset({
                 name: user.name || "",
                 email: user.email || "",
-                phone_number: user.phone_number || "",
-                oldPassword: "",
-                newPassword: "",
-                confirmNewPassword: "",
-                license_number: user.license_number || "",
+                phone_number: user.phoneNumber || user.phone_number || "",
+                license_number: user.licenseNumber || user.license_number || "",
                 address: {
-                    house_no: user.house_no || "",
-                    street: user.street || "",
-                    area: user.area || "",
-                    city: user.city || "",
-                    state: user.state || "",
-                    zip_code: user.zip_code || "",
-                    country: user.country || "",
+                    house_no: user.address?.houseNumber || user.house_no || "",
+                    street: user.address?.street || user.street || "",
+                    area: user.address?.area || user.area || "",
+                    city: user.address?.city || user.city || "",
+                    state: user.address?.state || user.state || "",
+                    zip_code: user.address?.zipCode || user.zip_code || "",
+                    country: user.address?.country || user.country || "",
                 },
             });
+            
+            // Set document preview URLs if available
+            if (user.licenseImageUrl) {
+                setPreviewDl(user.licenseImageUrl);
+            }
+            
+            if (user.aadhaarImageUrl) {
+                setPreviewAadhaar(user.aadhaarImageUrl);
+            }
+            
             formInitialized.current = true;
         }
-    }, [user, form]);
+    }, [user, profileForm]);
 
-    async function onSubmit(data: any) {
+    async function onProfileSubmit(data) {
         try {
-            if ((data.newPassword || data.confirmNewPassword) && data.newPassword !== data.confirmNewPassword) {
-                toast.warning("Passwords do not match",{
-                    description: "Please ensure the new passwords are identical."
-                });
-                return;
-            }
-
             const formData = new FormData();
             
-            const permanentAddress = {
-                house_no: data.address.house_no,
-                street: data.address.street,
-                area: data.address.area,
-                city: data.address.city,
-                state: data.address.state,
-                zip_code: data.address.zip_code,
-                country: data.address.country
-            };
-
-            const updatePayload = {
-                email: data.email,
-                phoneNumber: data.phone_number,
-                licenseNumber: data.license_number,
-                permanentAddress,
-                temporaryAddress: null
-            };
-
-            if (data.oldPassword && data.newPassword) {
-                updatePayload.oldPassword = data.oldPassword;
-                updatePayload.newPassword = data.newPassword;
-            }
-
-            if (aadhaarDocument) {
-                const reader = new FileReader();
-                reader.readAsDataURL(aadhaarDocument);
-                reader.onload = async () => {
-                    const base64String = reader.result?.toString().split(',')[1];
-                    if (base64String) {
-                        updatePayload.aadhaarImage = base64String;
-                    }
-                };
-            }
-
-            if (dlDocument) {
-                const reader = new FileReader();
-                reader.readAsDataURL(dlDocument);
-                reader.onload = async () => {
-                    const base64String = reader.result?.toString().split(',')[1];
-                    if (base64String) {
-                        updatePayload.licenseImage = base64String;
-                    }
-                };
-            }
-
-            const result = await updateProfile(updatePayload).unwrap();
+            formData.append("name", data.name);
+            formData.append("email", data.email);
+            formData.append("phoneNumber", data.phone_number);
+            formData.append("licenseNumber", data.license_number);
             
-            toast.success("Profile Updated Successfully",{ 
+            formData.append("houseNumber", data.address.house_no);
+            formData.append("street", data.address.street);
+            formData.append("area", data.address.area);
+            formData.append("city", data.address.city);
+            formData.append("state", data.address.state);
+            formData.append("zipCode", data.address.zip_code);
+            formData.append("country", data.address.country);
+            
+            if (dlDocument) {
+                formData.append("license_image", dlDocument);
+            }
+            
+            if (aadhaarDocument) {
+                formData.append("aadhaar_image", aadhaarDocument);
+            }
+
+            const result = await updateProfile(formData).unwrap();
+            
+            toast.success("Profile Updated Successfully", { 
                 description: result.message || "Your profile has been updated."
             });
             
+            // Update previews with new URLs if available in response
+            if (result.userInfo?.licenseImageUrl) {
+                setPreviewDl(result.userInfo.licenseImageUrl);
+            }
+            
+            if (result.userInfo?.aadhaarImageUrl) {
+                setPreviewAadhaar(result.userInfo.aadhaarImageUrl);
+            }
+            
             setIsEditing(false);
-        } catch (err: any) {
-            toast.error("Update Failed",{ 
+        } catch (err) {
+            toast.error("Update Failed", { 
                 description: err.data?.error || "An error occurred while updating your profile."
             });
         }
     }
 
-    const handleDLDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    async function onPasswordSubmit(data) {
+        try {
+            if (data.newPassword !== data.confirmNewPassword) {
+                toast.warning("Passwords do not match", {
+                    description: "Please ensure the new passwords are identical."
+                });
+                return;
+            }
+
+            const passwordData = {
+                oldPassword: data.oldPassword,
+                newPassword: data.newPassword
+            };
+
+            const result = await updatePassword(passwordData).unwrap();
+            
+            toast.success("Password Updated Successfully", { 
+                description: result.message || "Your password has been updated."
+            });
+            
+            passwordForm.reset({
+                oldPassword: "",
+                newPassword: "",
+                confirmNewPassword: "",
+            });
+            
+            setIsEditing(false);
+        } catch (err) {
+            toast.error("Password Update Failed", { 
+                description: err.data?.error || "An error occurred while updating your password."
+            });
+        }
+    }
+
+    const handleDLDocumentChange = (e) => {
         if (e.target.files && e.target.files[0]) {
-            setDlDocument(e.target.files[0]);
-            toast("Driving License Document Selected",{ description: e.target.files[0].name });
+            const file = e.target.files[0];
+            setDlDocument(file);
+            
+            // Create preview URL for the uploaded file
+            const objUrl = URL.createObjectURL(file);
+            setPreviewDl(objUrl);
+            
+            toast("Driving License Document Selected", { description: file.name });
         }
     };
 
-    const handleAadhaarDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleAadhaarDocumentChange = (e) => {
         if (e.target.files && e.target.files[0]) {
-            setAadhaarDocument(e.target.files[0]);
-            toast("Aadhaar Document Selected",{description: e.target.files[0].name });
+            const file = e.target.files[0];
+            setAadhaarDocument(file);
+            
+            // Create preview URL for the uploaded file
+            const objUrl = URL.createObjectURL(file);
+            setPreviewAadhaar(objUrl);
+            
+            toast("Aadhaar Document Selected", { description: file.name });
         }
     };
+
+    // Function to determine if file is an image by extension
+    const isImageFile = (url) => {
+        if (!url) return false;
+        const extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+        return extensions.some(ext => url.toLowerCase().includes(ext));
+    };
+
+    // Clean up object URLs on unmount
+    useEffect(() => {
+        return () => {
+            if (previewDl && previewDl.startsWith('blob:')) {
+                URL.revokeObjectURL(previewDl);
+            }
+            if (previewAadhaar && previewAadhaar.startsWith('blob:')) {
+                URL.revokeObjectURL(previewAadhaar);
+            }
+        };
+    }, []);
 
     if(isLoading){
         return (
@@ -180,7 +241,7 @@ export default function ProfilePage(){
                     <Button
                         onClick={() => setIsEditing(!isEditing)}
                         variant={isEditing ? "destructive" : "outline"}
-                        disabled={isUpdating}
+                        disabled={isUpdating || isUpdatingPassword}
                     >
                         {isEditing ? "Cancel Editing" : "Edit Profile"}
                     </Button>
@@ -204,8 +265,8 @@ export default function ProfilePage(){
 
                     {/* Personal Information and Address */}
                     <TabsContent value="personal">
-                        <Form {...form}>
-                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        <Form {...profileForm}>
+                            <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6">
                                 <Card>
                                     <CardHeader>
                                         <CardTitle className="flex items-center space-x-2">
@@ -215,7 +276,7 @@ export default function ProfilePage(){
                                     </CardHeader>
                                     <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                         <FormField
-                                            control={form.control}
+                                            control={profileForm.control}
                                             name="name"
                                             render={({ field }) => (
                                                 <FormItem>
@@ -228,7 +289,7 @@ export default function ProfilePage(){
                                             )}
                                         />
                                         <FormField
-                                            control={form.control}
+                                            control={profileForm.control}
                                             name="email"
                                             render={({ field }) => (
                                                 <FormItem>
@@ -241,7 +302,7 @@ export default function ProfilePage(){
                                             )}
                                         />
                                         <FormField
-                                            control={form.control}
+                                            control={profileForm.control}
                                             name="phone_number"
                                             render={({ field }) => (
                                                 <FormItem>
@@ -265,7 +326,7 @@ export default function ProfilePage(){
                                     </CardHeader>
                                     <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                         <FormField
-                                            control={form.control}
+                                            control={profileForm.control}
                                             name="address.house_no"
                                             render={({ field }) => (
                                                 <FormItem>
@@ -278,7 +339,7 @@ export default function ProfilePage(){
                                             )}
                                         />
                                         <FormField
-                                            control={form.control}
+                                            control={profileForm.control}
                                             name="address.street"
                                             render={({ field }) => (
                                                 <FormItem>
@@ -291,7 +352,7 @@ export default function ProfilePage(){
                                             )}
                                         />
                                         <FormField
-                                            control={form.control}
+                                            control={profileForm.control}
                                             name="address.area"
                                             render={({ field }) => (
                                                 <FormItem>
@@ -304,7 +365,7 @@ export default function ProfilePage(){
                                             )}
                                         />
                                         <FormField
-                                            control={form.control}
+                                            control={profileForm.control}
                                             name="address.city"
                                             render={({ field }) => (
                                                 <FormItem>
@@ -317,7 +378,7 @@ export default function ProfilePage(){
                                             )}
                                         />
                                         <FormField
-                                            control={form.control}
+                                            control={profileForm.control}
                                             name="address.state"
                                             render={({ field }) => (
                                                 <FormItem>
@@ -330,7 +391,7 @@ export default function ProfilePage(){
                                             )}
                                         />
                                         <FormField
-                                            control={form.control}
+                                            control={profileForm.control}
                                             name="address.zip_code"
                                             render={({ field }) => (
                                                 <FormItem>
@@ -343,7 +404,7 @@ export default function ProfilePage(){
                                             )}
                                         />
                                         <FormField
-                                            control={form.control}
+                                            control={profileForm.control}
                                             name="address.country"
                                             render={({ field }) => (
                                                 <FormItem>
@@ -374,10 +435,10 @@ export default function ProfilePage(){
                         </Form>
                     </TabsContent>
 
-                    {/* Security Tab - Now Separated */}
+                    {/* Security Tab - Separate Password Update Form */}
                     <TabsContent value="security">
-                        <Form {...form}>
-                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        <Form {...passwordForm}>
+                            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-6">
                                 <Card>
                                     <CardHeader>
                                         <CardTitle className="flex items-center space-x-2">
@@ -387,13 +448,13 @@ export default function ProfilePage(){
                                     </CardHeader>
                                     <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                         <FormField
-                                            control={form.control}
+                                            control={passwordForm.control}
                                             name="oldPassword"
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormLabel>Current Password</FormLabel>
                                                     <FormControl>
-                                                        <Input {...field} type="password" disabled={!isEditing || isUpdating} />
+                                                        <Input {...field} type="password" disabled={!isEditing || isUpdatingPassword} />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -401,26 +462,26 @@ export default function ProfilePage(){
                                         />
                                         <div></div> {/* Empty div for grid alignment */}
                                         <FormField
-                                            control={form.control}
+                                            control={passwordForm.control}
                                             name="newPassword"
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormLabel>New Password</FormLabel>
                                                     <FormControl>
-                                                        <Input {...field} type="password" disabled={!isEditing || isUpdating} />
+                                                        <Input {...field} type="password" disabled={!isEditing || isUpdatingPassword} />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
                                             )}
                                         />
                                         <FormField
-                                            control={form.control}
+                                            control={passwordForm.control}
                                             name="confirmNewPassword"
                                             render={({ field }) => (
                                                 <FormItem>
                                                     <FormLabel>Confirm New Password</FormLabel>
                                                     <FormControl>
-                                                        <Input {...field} type="password" disabled={!isEditing || isUpdating} />
+                                                        <Input {...field} type="password" disabled={!isEditing || isUpdatingPassword} />
                                                     </FormControl>
                                                     <FormMessage />
                                                 </FormItem>
@@ -460,14 +521,14 @@ export default function ProfilePage(){
                                 </Card>
 
                                 {isEditing && (
-                                    <Button type="submit" className="w-full" disabled={isUpdating}>
-                                        {isUpdating ? (
+                                    <Button type="submit" className="w-full" disabled={isUpdatingPassword}>
+                                        {isUpdatingPassword ? (
                                             <>
                                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                Updating Security Settings...
+                                                Updating Password...
                                             </>
                                         ) : (
-                                            "Update Security Settings"
+                                            "Update Password"
                                         )}
                                     </Button>
                                 )}
@@ -477,8 +538,8 @@ export default function ProfilePage(){
 
                     {/* Documents Tab for Driving License and Aadhaar */}
                     <TabsContent value="documents">
-                        <Form {...form}>
-                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                        <Form {...profileForm}>
+                            <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-6" encType="multipart/form-data">
                                 <Card>
                                     <CardHeader>
                                         <CardTitle className="flex items-center space-x-2">
@@ -488,7 +549,7 @@ export default function ProfilePage(){
                                     </CardHeader>
                                     <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                         <FormField
-                                            control={form.control}
+                                            control={profileForm.control}
                                             name="license_number"
                                             render={({ field }) => (
                                                 <FormItem>
@@ -505,28 +566,78 @@ export default function ProfilePage(){
                                             <FormControl>
                                                 <div className={`border rounded-md border-input p-2 ${!isEditing ? 'bg-gray-100' : ''}`}>
                                                     <div className="flex items-center justify-center flex-col p-4">
-                                                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                                                        {previewDl ? (
+                                                            <div className="w-full flex flex-col items-center">
+                                                                {isImageFile(previewDl) ? (
+                                                                    <div className="relative mb-4 w-full max-w-xs">
+                                                                        <img 
+                                                                            src={previewDl} 
+                                                                            alt="Driving License Preview" 
+                                                                            className="max-h-40 object-contain rounded-md border border-gray-200 w-full"
+                                                                        />
+                                                                        {isEditing && (
+                                                                            <div className="absolute top-2 right-2">
+                                                                                <Button
+                                                                                    variant="secondary"
+                                                                                    size="sm"
+                                                                                    className="w-8 h-8 rounded-full p-0"
+                                                                                    type="button"
+                                                                                    onClick={() => window.open(previewDl, '_blank')}
+                                                                                >
+                                                                                    <Eye className="h-4 w-4" />
+                                                                                </Button>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="mb-4 p-3 bg-gray-50 rounded border border-gray-200 w-full max-w-xs">
+                                                                        <div className="flex items-center">
+                                                                            <FileText className="h-5 w-5 text-gray-500 mr-2" />
+                                                                            <span className="text-sm text-gray-700 truncate">
+                                                                                Document {dlDocument ? dlDocument.name : "File"}
+                                                                            </span>
+                                                                            {isEditing && (
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    className="ml-auto w-8 h-8 rounded-full p-0"
+                                                                                    type="button"
+                                                                                    onClick={() => window.open(previewDl, '_blank')}
+                                                                                >
+                                                                                    <Eye className="h-4 w-4" />
+                                                                                </Button>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {isEditing && (
+                                                                    <div className="text-sm text-center text-muted-foreground">
+                                                                        <label htmlFor="license_image" className="cursor-pointer">
+                                                                            <span className="font-medium">Change file</span>
+                                                                        </label>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                                                                <div className="text-sm text-center text-muted-foreground">
+                                                                    <label htmlFor="license_image" className={`cursor-pointer ${!isEditing || isUpdating ? 'pointer-events-none' : ''}`}>
+                                                                        <span className="font-medium">Click to upload</span> or drag and drop
+                                                                    </label>
+                                                                    <p>PDF, JPG or PNG (max. 5MB)</p>
+                                                                </div>
+                                                            </>
+                                                        )}
                                                         <Input
-                                                            id="dlDocument"
+                                                            id="license_image"
+                                                            name="license_image"
                                                             type="file"
                                                             className="hidden"
                                                             onChange={handleDLDocumentChange}
                                                             disabled={!isEditing || isUpdating}
                                                             accept=".jpg,.jpeg,.png,.pdf"
                                                         />
-                                                        {dlDocument ? (
-                                                            <div className="text-sm text-center">
-                                                                <p className="font-medium">{dlDocument.name}</p>
-                                                                <p className="text-muted-foreground">{(dlDocument.size / 1024).toFixed(2)} KB</p>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="text-sm text-center text-muted-foreground">
-                                                                <label htmlFor="dlDocument" className={`cursor-pointer ${!isEditing || isUpdating ? 'pointer-events-none' : ''}`}>
-                                                                    <span className="font-medium">Click to upload</span> or drag and drop
-                                                                </label>
-                                                                <p>PDF, JPG or PNG (max. 5MB)</p>
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 </div>
                                             </FormControl>
@@ -549,28 +660,79 @@ export default function ProfilePage(){
                                             <FormControl>
                                                 <div className={`border rounded-md border-input p-2 ${!isEditing ? 'bg-gray-100' : ''}`}>
                                                     <div className="flex items-center justify-center flex-col p-4">
-                                                        <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                                                        {previewAadhaar ? (
+                                                            <div className="w-full flex flex-col items-center">
+                                                                {isImageFile(previewAadhaar) ? (
+                                                                    <div className="relative mb-4 w-full max-w-xs">
+                                                                        <img 
+                                                                            src={previewAadhaar} 
+                                                                            alt="Aadhaar Card Preview" 
+                                                                            className="max-h-40 object-contain rounded-md border border-gray-200 w-full"
+                                                                        />
+                                                                        {isEditing && (
+                                                                            <div className="absolute top-2 right-2">
+                                                                                <Button
+                                                                                    variant="secondary"
+                                                                                    size="sm"
+                                                                                    className="w-8 h-8 rounded-full p-0"
+                                                                                    type="button"
+                                                                                    onClick={() => window.open(previewAadhaar, '_blank')}
+                                                                                >
+                                                                                    <Eye className="h-4 w-4" />
+                                                                                </Button>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="mb-4 p-3 bg-gray-50 rounded border border-gray-200 w-full max-w-xs">
+                                                                        <div className="flex items-center">
+                                                                            <FileText className="h-5 w-5 text-gray-500 mr-2" />
+                                                                            <span className="text-sm text-gray-700 truncate">
+                                                                                Document {aadhaarDocument ? aadhaarDocument.name : "File"}
+                                                                            </span>
+                                                                            {isEditing && (
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    size="sm"
+                                                                                    className="ml-auto w-8 h-8 rounded-full p-0"
+                                                                                    type="button"
+                                                                                    onClick={() => window.open(previewAadhaar, '_blank')}
+                                                                                >
+                                                                                    <Eye className="h-4 w-4" />
+                                                                                </Button>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                                {isEditing && (
+                                                                    <div className="text-sm text-center text-muted-foreground">
+                                                                        <label htmlFor="aadhaar_image" className="cursor-pointer">
+                                                                            <span className="font-medium">Change file</span>
+                                                                        </label>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <Upload className="h-8 w-8 text-muted-foreground mb-2" />
+                                                                <div className="text-sm text-center text-muted-foreground">
+                                                                    <label htmlFor="aadhaar_image" className={`cursor-pointer ${!isEditing || isUpdating ? 'pointer-events-none' : ''}`}>
+                                                                        <span className="font-medium">Click to upload</span> or drag and drop
+                                                                    </label>
+                                                                    <p>PDF, JPG or PNG (max. 5MB)</p>
+                                                                </div>
+                                                            </>
+                                                        )}
                                                         <Input
-                                                            id="aadhaarDocument"
+                                                            id="aadhaar_image"
+                                                            name="aadhaar_image"
                                                             type="file"
                                                             className="hidden"
                                                             onChange={handleAadhaarDocumentChange}
                                                             disabled={!isEditing || isUpdating}
                                                             accept=".jpg,.jpeg,.png,.pdf"
                                                         />
-                                                        {aadhaarDocument ? (
-                                                            <div className="text-sm text-center">
-                                                                <p className="font-medium">{aadhaarDocument.name}</p>
-                                                                <p className="text-muted-foreground">{(aadhaarDocument.size / 1024).toFixed(2)} KB</p>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="text-sm text-center text-muted-foreground">
-                                                                <label htmlFor="aadhaarDocument" className={`cursor-pointer ${!isEditing || isUpdating ? 'pointer-events-none' : ''}`}>
-                                                                    <span className="font-medium">Click to upload</span> or drag and drop
-                                                                </label>
-                                                                <p>PDF, JPG or PNG (max. 5MB)</p>
-                                                            </div>
-                                                        )}
+                                                      
                                                     </div>
                                                 </div>
                                             </FormControl>
