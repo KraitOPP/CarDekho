@@ -6,6 +6,7 @@ async function addBrand(req, res) {
   try {
     const { brand_name } = req.body;
     const logoFile = req.files?.brand_logo?.[0];
+    console.log('Logo file:', logoFile);
 
     if (!brand_name) {
       return res.status(400).json({ error: 'Brand name is required' });
@@ -103,26 +104,72 @@ async function deleteBrand(req, res) {
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
-    const brandRows = await connection.query(`SELECT brand_logo FROM vehicle_brands WHERE id = ?`, [brandId]);
+    // Get brand logo before deletion
+    const brandRows = await connection.query(
+      `SELECT brand_logo FROM vehicle_brands WHERE id = ?`,
+      [brandId]
+    );
     const brandLogo = brandRows[0][0]?.brand_logo;
 
-    // Delete vehicles linked to brand
-    await connection.query(`DELETE FROM vehicles WHERE brand_id = ?`, [brandId]);
+    // Get all model IDs for the brand
+    const [modelRows] = await connection.query(
+      `SELECT id FROM vehicle_models WHERE brand_id = ?`,
+      [brandId]
+    );
+    const modelIds = modelRows.map(row => row.id);
 
-    // Delete models linked to brand
-    await connection.query(`DELETE FROM vehicle_models WHERE brand_id = ?`, [brandId]);
+    if (modelIds.length > 0) {
+      // Get all vehicle IDs for those models
+      const [vehicleRows] = await connection.query(
+        `SELECT id FROM vehicles WHERE model_id IN (?)`,
+        [modelIds]
+      );
+      const vehicleIds = vehicleRows.map(row => row.id);
 
-    const [brandResult] = await connection.query(`DELETE FROM vehicle_brands WHERE id = ?`, [brandId]);
+      if (vehicleIds.length > 0) {
+        // Delete vehicle images
+        await connection.query(
+          `DELETE FROM vehicle_images WHERE vehicle_id IN (?)`,
+          [vehicleIds]
+        );
+
+        // Delete vehicles
+        await connection.query(
+          `DELETE FROM vehicles WHERE id IN (?)`,
+          [vehicleIds]
+        );
+      }
+
+      // Delete model images
+      await connection.query(
+        `DELETE FROM vehicle_model_images WHERE model_id IN (?)`,
+        [modelIds]
+      );
+
+      // Delete models
+      await connection.query(
+        `DELETE FROM vehicle_models WHERE id IN (?)`,
+        [modelIds]
+      );
+    }
+
+    // Delete the brand itself
+    const [brandResult] = await connection.query(
+      `DELETE FROM vehicle_brands WHERE id = ?`,
+      [brandId]
+    );
 
     if (brandResult.affectedRows === 0) {
       await connection.rollback();
       return res.status(404).json({ error: 'Brand not found or already deleted' });
     }
 
+    // Delete the brand logo from Cloudinary if it exists
     if (brandLogo) await deleteFromCloudinary(brandLogo);
 
     await connection.commit();
-    return res.status(200).json({ message: 'Brand, models, and associated vehicles deleted successfully' });
+    return res.status(200).json({ message: 'Brand, models, vehicles, and related images deleted successfully' });
+
   } catch (error) {
     if (connection) await connection.rollback();
     console.error('Error deleting brand:', error);

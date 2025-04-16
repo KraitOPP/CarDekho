@@ -10,14 +10,20 @@ const {
 
 const { isAdmin } = require('../middlewares/isAdmin.js');
 const { verifyJWT } = require('../middlewares/auth');
+const { upload } = require('../middlewares/cloudinary.js');
 
 // Public routes
 router.get('/get-brands', getBrands);
 router.get('/get-brand/:id', getBrandById);
 
 // Admin-protected routes
-router.post('/add-brand', verifyJWT, isAdmin, addBrand);
-router.put('/update-brand/:id', verifyJWT, isAdmin, updateBrand);
+router.post('/add-brand', verifyJWT, isAdmin,upload.fields([
+  { name: 'brand_logo', maxCount: 1 }
+]), addBrand);
+router.put('/update-brand/:id', verifyJWT, isAdmin,
+  upload.fields([
+    { name: 'brand_logo', maxCount: 1 }
+  ]), updateBrand);
 router.delete('/delete-brand/:id', verifyJWT, isAdmin, deleteBrand);
 
 
