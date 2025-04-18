@@ -1,5 +1,5 @@
-const { executeQuery } = require('../db/db.js');
-const { uploadOnCloudinary, deleteFromCloudinary } = require('../middlewares/cloudinary.js');
+const { executeQuery,pool } = require('../db/db.js');
+const { uploadOnCloudinary, deleteFromCloudinary ,} = require('../middlewares/cloudinary.js');
 
 // Add a new vehicle
 async function addVehicle(req, res) {
@@ -174,23 +174,24 @@ async function updateVehicle(req, res) {
     }
 }
 
-// Delete a vehicle
 async function deleteVehicle(req, res) {
     try {
         const { id } = req.params;
 
-        const images = await executeQuery(`SELECT image_path FROM vehicle_images WHERE vehicle_id=?`, [id]);
-        for (const image of images) {
-            await deleteFromCloudinary(image.image_path);
+        const [rows] = await pool.query(`CALL deleteVehicleAndReturnImagesOUT(?, @imagePaths); SELECT @imagePaths AS imagePaths`, [id]);
+
+        const imagePathsString = rows[1][0].imagePaths;
+        const imagePaths = imagePathsString ? imagePathsString.split(',').filter(Boolean) : [];
+
+        for (const imagePath of imagePaths) {
+            await deleteFromCloudinary(imagePath);
         }
 
-        await executeQuery(`DELETE FROM vehicle_images WHERE vehicle_id=?`, [id]);
-        await executeQuery(`DELETE FROM vehicles WHERE id=?`, [id]);
-
-        res.status(200).json({ message: 'Vehicle deleted successfully' });
+        res.status(200).json({ message: 'Vehicle deleted successfully'});
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 }
+
 
 module.exports = { addVehicle, getAllVehicle, getVehicle, deleteVehicle, updateVehicle };

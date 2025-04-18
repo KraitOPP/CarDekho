@@ -16,7 +16,16 @@ async function addVehicleModel(req, res) {
             description,
             features
         } = req.body;
-
+        console.log(brand_id,
+            model_name,
+            category,
+            price_per_day,
+            fuel_type,
+            transmission,
+            number_of_doors,
+            number_of_seats,
+            description,
+            features);
         const images = req.files;
 
         const query = `
@@ -163,21 +172,25 @@ async function deleteVehicleModel(req, res) {
     try {
         const { id } = req.params;
 
-        await executeQuery(`DELETE FROM vehicles WHERE model=?`, [id]);
+        // Get all Cloudinary image paths
+        const modelImages = await executeQuery(
+            `SELECT image_path FROM vehicle_model_images WHERE model_id=?`,
+            [id]
+        );
 
-        const modelImages = await executeQuery(`SELECT image_path FROM vehicle_model_images WHERE model_id=?`, [id]);
         for (const img of modelImages) {
-            await deleteFromCloudinary(img.image_path);
+            await deleteFromCloudinary(img.image_path); // This remains in Node.js
         }
-        await executeQuery(`DELETE FROM vehicle_model_images WHERE model_id=?`, [id]);
 
-        await executeQuery(`DELETE FROM vehicle_models WHERE id=?`, [id]);
+        // Call the stored procedure to delete all related records
+        await executeQuery(`CALL DeleteVehicleModelById(?)`, [id]);
 
-        res.status(200).json({ message: 'Vehicle model and associated vehicles deleted successfully' });
+        res.status(200).json({ message: 'Vehicle model and associated data deleted successfully' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 }
+
 
 
 module.exports = {
