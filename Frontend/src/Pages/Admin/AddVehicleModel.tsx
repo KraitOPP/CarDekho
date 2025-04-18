@@ -1,417 +1,656 @@
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState, ChangeEvent, useEffect } from 'react';
+import { Plus, Save, X, Edit, Trash2, Eye, ArrowLeft, Upload } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import {
-    Plus,
-    Save,
-    X,
-    ImagePlus
-} from 'lucide-react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Link } from 'react-router';
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from 'sonner';
 import { useGetBrandsQuery } from '@/slices/brandApiSlice';
+import {
+  useGetVehicleModelsQuery,
+  useAddVehicleModelMutation,
+  useUpdateVehicleModelMutation,
+  useDeleteVehicleModelMutation
+} from '@/slices/vehicleModelApiSlice';
 
-interface VehicleModel {
-    brand: string;
-    model: string;
-    year: string;
-    category: string;
-    pricePerDay: string;
-    description: string;
-    features: string[];
-    images: File[];
-    previewUrls: string[];
-    fuelType: string;
-    transmission: string;
-    doors: string;
-    seats: string;
-    color: string;
+interface VehicleModelForm {
+  brand_id: string;
+  model_name: string;
+  category: string;
+  price_per_day: string;
+  description: string;
+  features: string[];
+  images: File[];
+  previewUrls: string[];
+  fuel_type: string;
+  transmission: string;
+  number_of_doors: string;
+  number_of_seats: string;
 }
 
 const VehicleModelManagement: React.FC = () => {
-    const [vehicleModel, setVehicleModel] = useState<VehicleModel>({
-        brand: '',
-        model: '',
-        year: '',
-        category: '',
-        pricePerDay: '',
-        description: '',
-        features: [],
-        images: [],
-        previewUrls: [],
-        fuelType: '',
-        transmission: '',
-        doors: '',
-        seats: '',
-        color: ''
+  const { data: brandData, isLoading: loadingBrands } = useGetBrandsQuery();
+  const { data: modelData, refetch: refetchModels, isLoading: loadingModels } = useGetVehicleModelsQuery();
+  const [addModel, { isLoading: adding }] = useAddVehicleModelMutation();
+  const [updateModel, { isLoading: updating }] = useUpdateVehicleModelMutation();
+  const [deleteModel, { isLoading: deleting }] = useDeleteVehicleModelMutation();
+
+  const brands = brandData?.brands || [];
+  const models = Array.isArray(modelData) ? modelData : [];
+
+  const [mode, setMode] = useState<'list' | 'add' | 'edit' | 'view'>('list');
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState("basic");
+  const [newFeature, setNewFeature] = useState('');
+  const [form, setForm] = useState<VehicleModelForm>({
+    brand_id: '',
+    model_name: '',
+    category: '',
+    price_per_day: '',
+    description: '',
+    features: [],
+    images: [],
+    previewUrls: [],
+    fuel_type: '',
+    transmission: '',
+    number_of_doors: '',
+    number_of_seats: ''
+  });
+
+  useEffect(() => {
+    if ((mode === 'edit' || mode === 'view') && selectedId !== null) {
+      const model = models.find(m => m.id === selectedId);
+      if (model) {
+        setForm({
+          brand_id: String(model.brand_id),
+          model_name: model.model_name,
+          category: model.category,
+          price_per_day: String(model.price_per_day),
+          description: model.description,
+          features: Array.isArray(model.features) ? model.features : [],
+          images: [],
+          previewUrls: model.images || [],
+          fuel_type: model.fuel_type,
+          transmission: model.transmission,
+          number_of_doors: String(model.number_of_doors),
+          number_of_seats: String(model.number_of_seats)
+        });
+      }
+    }
+  }, [mode, selectedId, models]);
+
+  const updateField = <K extends keyof VehicleModelForm>(key: K, value: VehicleModelForm[K]) => {
+    setForm(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleAddFeature = () => {
+    const feature = newFeature.trim();
+    if (feature && !form.features.includes(feature)) {
+      updateField('features', [...form.features, feature]);
+      setNewFeature('');
+    }
+  };
+
+  const handleRemoveFeature = (feature: string) => {
+    updateField('features', form.features.filter(f => f !== feature));
+  };
+
+  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    
+    const newFiles: File[] = [];
+    const newPreviews: string[] = [];
+    
+    Array.from(e.target.files).forEach(file => {
+      newFiles.push(file);
+      newPreviews.push(URL.createObjectURL(file));
     });
+    
+    updateField('images', [...form.images, ...newFiles]);
+    updateField('previewUrls', [...form.previewUrls, ...newPreviews]);
+  };
 
-    const brands: string[] = [
-        'Toyota', 'Ford', 'BMW', 'Mercedes', 'Honda', 'Audi', 'Volkswagen', 'Hyundai', 'Kia', 'Nissan'
-    ];
+  const removeImage = (index: number) => {
+    const images = [...form.images];
+    const previews = [...form.previewUrls];
+    
+    images.splice(index, 1);
+    previews.splice(index, 1);
+    
+    updateField('images', images);
+    updateField('previewUrls', previews);
+  };
 
-    const fuelTypes: string[] = [
-        'Petrol', 'Diesel', 'Hybrid', 'Electric', 'CNG', 'LPG'
-    ];
+  const resetForm = () => {
+    setForm({
+      brand_id: '',
+      model_name: '',
+      category: '',
+      price_per_day: '',
+      description: '',
+      features: [],
+      images: [],
+      previewUrls: [],
+      fuel_type: '',
+      transmission: '',
+      number_of_doors: '',
+      number_of_seats: ''
+    });
+    setActiveTab("basic");
+  };
 
-    const transmissions: string[] = [
-        'Manual', 'Automatic', 'Semi-Automatic', 'CVT'
-    ];
+  const onSubmit = async () => {
+    try {
+      const formData = new FormData();
+      formData.append('brand_id', form.brand_id);
+      formData.append('model_name', form.model_name);
+      formData.append('category', form.category);
+      formData.append('price_per_day', form.price_per_day);
+      formData.append('description', form.description);
+      formData.append('features', JSON.stringify(form.features));
+      formData.append('fuel_type', form.fuel_type);
+      formData.append('transmission', form.transmission);
+      formData.append('number_of_doors', form.number_of_doors);
+      formData.append('number_of_seats', form.number_of_seats);
+      
+      form.images.forEach(img => formData.append('images', img));
 
-    const [newFeature, setNewFeature] = useState<string>('');
+      if (mode === 'add') {
+        await addModel(formData).unwrap();
+        toast.success('Vehicle model added successfully');
+        resetForm();
+      } else if (mode === 'edit' && selectedId !== null) {
+        await updateModel({ id: selectedId, payload: formData }).unwrap();
+        toast.success('Vehicle model updated successfully');
+      }
+      
+      refetchModels();
+      setMode('list');
+      setSelectedId(null);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.data?.error || 'Operation failed');
+    }
+  };
 
-    const handleAddFeature = () => {
-        if (newFeature.trim() && !vehicleModel.features.includes(newFeature.trim())) {
-            setVehicleModel({
-                ...vehicleModel,
-                features: [...vehicleModel.features, newFeature.trim()]
-            });
-            setNewFeature('');
-        }
-    };
+  const onDelete = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this vehicle model?')) return;
+    
+    try {
+      await deleteModel({ id }).unwrap();
+      toast.success('Vehicle model deleted successfully');
+      refetchModels();
+    } catch (err) {
+      toast.error('Failed to delete vehicle model');
+    }
+  };
 
-    const handleRemoveFeature = (featureToRemove: string) => {
-        setVehicleModel({
-            ...vehicleModel,
-            features: vehicleModel.features.filter(feature => feature !== featureToRemove)
-        });
-    };
-
-    const handleSubmit = () => {
-        console.log('Vehicle Model Data:', vehicleModel);
-        alert('Vehicle model submitted/updated!');
-    };
-
-    const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (!files) return;
-
-        const newImages = [...vehicleModel.images];
-        const newPreviewUrls = [...vehicleModel.previewUrls];
-
-        Array.from(files).forEach(file => {
-            newImages.push(file);
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                newPreviewUrls.push(reader.result as string);
-                setVehicleModel({
-                    ...vehicleModel,
-                    images: newImages,
-                    previewUrls: newPreviewUrls
-                });
-            };
-            reader.readAsDataURL(file);
-        });
-    };
-
-    const removeImage = (index: number) => {
-        const newImages = [...vehicleModel.images];
-        const newPreviewUrls = [...vehicleModel.previewUrls];
-        
-        newImages.splice(index, 1);
-        newPreviewUrls.splice(index, 1);
-        
-        setVehicleModel({
-            ...vehicleModel,
-            images: newImages,
-            previewUrls: newPreviewUrls
-        });
-    };
-
-    const updateVehicleModelField = <K extends keyof VehicleModel>(
-        field: K,
-        value: VehicleModel[K]
-    ) => {
-        setVehicleModel(prev => ({
-            ...prev,
-            [field]: value
-        }));
-    };
-
-    return (
-        <div className="container mx-auto p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold">Add/Edit Vehicle Model</h1>
-                <div className="flex gap-3">
-                    <Link to={'/dashboard'}>
-                        <Button variant="outline">
-                            Back to Dashboard
-                        </Button>
-                    </Link>
-                    <Link to={'/dashboard/vehicle'}>
-                        <Button>
-                            Add Individual Vehicle
-                        </Button>
-                    </Link>
-                </div>
+  return (
+    <div className="container mx-auto py-6">
+      {/* List view */}
+      {mode === 'list' && (
+        <>
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="text-3xl font-bold">Vehicle Models</h1>
+              <p className="text-gray-500 mt-1">Manage your available vehicle models</p>
             </div>
+            <Button onClick={() => { resetForm(); setMode('add'); }}>
+              <Plus className="mr-2" /> Add New Model
+            </Button>
+          </div>
 
-            <Card>
-                <CardContent className="p-6">
-                    <div className="mb-6">
-                        <h2 className="text-xl font-semibold mb-4">Basic Information</h2>
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div>
-                                <Label className="mb-2">Brand</Label>
-                                <Select
-                                    value={vehicleModel.brand}
-                                    onValueChange={(value) => updateVehicleModelField('brand', value)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Brand" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {brands.map(brand => (
-                                            <SelectItem key={brand} value={brand}>
-                                                {brand}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div>
-                                <Label className="mb-2">Model</Label>
-                                <Input
-                                    placeholder="Vehicle Model"
-                                    value={vehicleModel.model}
-                                    onChange={(e) => updateVehicleModelField('model', e.target.value)}
-                                />
-                            </div>
-
-                            <div>
-                                <Label className="mb-2">Category</Label>
-                                <Select
-                                    value={vehicleModel.category}
-                                    onValueChange={(value) => updateVehicleModelField('category', value)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Category" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {['Economy', 'Sedan', 'SUV', 'Luxury', 'Van', 'Truck', 'Convertible', 'Sports', 'Minivan'].map(category => (
-                                            <SelectItem key={category} value={category}>
-                                                {category}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div>
-                                <Label className="mb-2">Price per Day</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="Rental Price"
-                                    value={vehicleModel.pricePerDay}
-                                    onChange={(e) => updateVehicleModelField('pricePerDay', e.target.value)}
-                                />
-                            </div>
-                        </div>
+          {loadingModels ? (
+            <div className="flex justify-center p-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {models.map(model => (
+                <Card key={model.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-xl">{model.model_name}</CardTitle>
+                        <CardDescription>
+                          {brands.find(b => b.id === model.brand_id)?.brand_name}
+                        </CardDescription>
+                      </div>
+                      <Badge>{model.category}</Badge>
                     </div>
-
-                    <div className="mb-6">
-                        <h2 className="text-xl font-semibold mb-4">Technical Specifications</h2>
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div>
-                                <Label className="mb-2">Fuel Type</Label>
-                                <Select
-                                    value={vehicleModel.fuelType}
-                                    onValueChange={(value) => updateVehicleModelField('fuelType', value)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Fuel Type" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {fuelTypes.map(type => (
-                                            <SelectItem key={type} value={type}>
-                                                {type}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div>
-                                <Label className="mb-2">Transmission</Label>
-                                <Select
-                                    value={vehicleModel.transmission}
-                                    onValueChange={(value) => updateVehicleModelField('transmission', value)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Transmission" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {transmissions.map(type => (
-                                            <SelectItem key={type} value={type}>
-                                                {type}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div>
-                                <Label className="mb-2">Number of Doors</Label>
-                                <Select
-                                    value={vehicleModel.doors}
-                                    onValueChange={(value) => updateVehicleModelField('doors', value)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Doors" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {['2', '3', '4', '5'].map(doors => (
-                                            <SelectItem key={doors} value={doors}>
-                                                {doors}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div>
-                                <Label className="mb-2">Number of Seats</Label>
-                                <Select
-                                    value={vehicleModel.seats}
-                                    onValueChange={(value) => updateVehicleModelField('seats', value)}
-                                >
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Select Seats" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {['2', '4', '5', '7', '8', '9+'].map(seats => (
-                                            <SelectItem key={seats} value={seats}>
-                                                {seats}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="mb-4">
+                      <p className="text-lg font-semibold">${model.price_per_day}/day</p>
+                      <div className="flex items-center text-sm text-gray-500 mt-1">
+                        <span className="mr-3">{model.fuel_type}</span>
+                        <span className="mr-3">{model.transmission}</span>
+                        <span>{model.number_of_seats} seats</span>
+                      </div>
                     </div>
-
-                    <div className="mb-6">
-                        <h2 className="text-xl font-semibold mb-4">Features & Description</h2>
-                        <div className="mb-4">
-                            <Label className="mb-2">Description</Label>
-                            <Textarea
-                                placeholder="Vehicle Description"
-                                value={vehicleModel.description}
-                                onChange={(e) => updateVehicleModelField('description', e.target.value)}
-                            />
-                        </div>
-
-                        <div>
-                            <Label className="mb-2">Features</Label>
-                            <div className="flex space-x-2 mb-4">
-                                <Input
-                                    placeholder="Add a feature"
-                                    value={newFeature}
-                                    onChange={(e) => setNewFeature(e.target.value)}
-                                    onKeyDown={(e) => e.key === 'Enter' && handleAddFeature()}
-                                />
-                                <Button onClick={handleAddFeature}>
-                                    <Plus className="mr-2" /> Add
-                                </Button>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2">
-                                {vehicleModel.features.map(feature => (
-                                    <Badge
-                                        key={feature}
-                                        variant="secondary"
-                                        className="flex items-center"
-                                    >
-                                        {feature}
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="ml-2 w-4 h-4"
-                                            onClick={() => handleRemoveFeature(feature)}
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </Button>
-                                    </Badge>
-                                ))}
-                            </div>
-                        </div>
+                    <div className="flex space-x-2 mt-4">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => { setSelectedId(model.id); setMode('view'); }}
+                      >
+                        <Eye size={16} className="mr-1" /> View
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => { setSelectedId(model.id); setMode('edit'); }}
+                      >
+                        <Edit size={16} className="mr-1" /> Edit
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="text-red-500 hover:text-red-700"
+                        onClick={() => onDelete(model.id)} 
+                        disabled={deleting}
+                      >
+                        <Trash2 size={16} className="mr-1" /> Delete
+                      </Button>
                     </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
-                    <div className="mb-6">
-                        <h2 className="text-xl font-semibold mb-4">Vehicle Images</h2>
-                        <div>
-                            <Label className="mb-2">Upload Images</Label>
-                            <div className="flex space-x-2">
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    id="imageUpload"
-                                    multiple
-                                    onChange={handleImageUpload}
-                                />
-                                <Button
-                                    variant="outline"
-                                    onClick={() => document.getElementById('imageUpload')?.click()}
-                                    className="w-full"
-                                >
-                                    <ImagePlus className="mr-2" /> Upload Images
-                                </Button>
-                            </div>
-                            
-                            {vehicleModel.previewUrls.length > 0 && (
-                                <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                                    {vehicleModel.previewUrls.map((url, index) => (
-                                        <div key={index} className="relative">
-                                            <img
-                                                src={url}
-                                                alt={`Vehicle ${index + 1}`}
-                                                className="w-full h-32 object-cover rounded-md"
-                                            />
-                                            <Button
-                                                variant="destructive"
-                                                size="icon"
-                                                className="absolute top-2 right-2 w-6 h-6"
-                                                onClick={() => removeImage(index)}
-                                            >
-                                                <X className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="mt-6 flex justify-end space-x-4">
-                        <Button
-                            variant="outline"
-                            onClick={() => window.history.back()}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleSubmit}
-                            disabled={!vehicleModel.brand || !vehicleModel.model}
-                        >
-                            <Save className="mr-2" /> Save Vehicle Model
-                        </Button>
-                    </div>
-                </CardContent>
+          {models.length === 0 && !loadingModels && (
+            <Card className="p-12 text-center">
+              <p className="text-gray-500 mb-4">No vehicle models found</p>
+              <Button onClick={() => { resetForm(); setMode('add'); }}>Add Your First Model</Button>
             </Card>
+          )}
+        </>
+      )}
+
+      {/* Add/Edit/View Form */}
+      {mode !== 'list' && (
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-6 border-b">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => { setMode('list'); setSelectedId(null); }}
+                  className="mr-4"
+                >
+                  <ArrowLeft />
+                </Button>
+                <div>
+                  <h1 className="text-2xl font-bold">
+                    {mode === 'add' && 'Add New Vehicle Model'}
+                    {mode === 'edit' && 'Edit Vehicle Model'}
+                    {mode === 'view' && 'Vehicle Model Details'}
+                  </h1>
+                  {mode === 'view' && selectedId !== null && (
+                    <p className="text-gray-500 mt-1">
+                      {models.find(m => m.id === selectedId)?.model_name}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {mode === 'view' && (
+                <Button 
+                  onClick={() => { setMode('edit'); }}
+                  variant="outline"
+                >
+                  <Edit size={16} className="mr-2" /> Edit
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="p-6">
+            <Tabs 
+              value={activeTab} 
+              onValueChange={setActiveTab}
+              className="w-full"
+            >
+              <TabsList className="grid grid-cols-3 mb-6">
+                <TabsTrigger value="basic">Basic Information</TabsTrigger>
+                <TabsTrigger value="specs">Specifications</TabsTrigger>
+                <TabsTrigger value="details">Details & Images</TabsTrigger>
+              </TabsList>
+
+              {/* Basic Information Tab */}
+              <TabsContent value="basic" className="mt-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label htmlFor="brand">Brand</Label>
+                    <Select
+                      value={form.brand_id}
+                      onValueChange={v => updateField('brand_id', v)}
+                      disabled={mode === 'view'}
+                    >
+                      <SelectTrigger id="brand" className="mt-1">
+                        <SelectValue placeholder={loadingBrands ? 'Loading brands...' : 'Select a brand'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {brands.map(brand => (
+                          <SelectItem key={brand.id} value={String(brand.id)}>
+                            {brand.brand_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="model_name">Model Name</Label>
+                    <Input
+                      id="model_name"
+                      value={form.model_name}
+                      onChange={e => updateField('model_name', e.target.value)}
+                      disabled={mode === 'view'}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="category">Category</Label>
+                    <Select
+                      value={form.category}
+                      onValueChange={v => updateField('category', v)}
+                      disabled={mode === 'view'}
+                    >
+                      <SelectTrigger id="category" className="mt-1">
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['Sedan', 'SUV', 'Hatchback', 'Convertible', 'Truck', 'Van', 'Luxury'].map(cat => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="price_per_day">Price per Day ($)</Label>
+                    <Input
+                      id="price_per_day"
+                      type="number"
+                      value={form.price_per_day}
+                      onChange={e => updateField('price_per_day', e.target.value)}
+                      disabled={mode === 'view'}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-8 flex justify-between">
+                  <Button
+                    variant="outline"
+                    onClick={() => { setMode('list'); setSelectedId(null); }}
+                  >
+                    Cancel
+                  </Button>
+                  {mode !== 'view' && (
+                    <Button onClick={() => setActiveTab("specs")}>
+                      Continue
+                    </Button>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* Specifications Tab */}
+              <TabsContent value="specs" className="mt-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label htmlFor="fuel_type">Fuel Type</Label>
+                    <Select
+                      value={form.fuel_type}
+                      onValueChange={v => updateField('fuel_type', v)}
+                      disabled={mode === 'view'}
+                    >
+                      <SelectTrigger id="fuel_type" className="mt-1">
+                        <SelectValue placeholder="Select fuel type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['Gasoline', 'Diesel', 'Electric', 'Hybrid', 'Plug-in Hybrid'].map(type => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="transmission">Transmission</Label>
+                    <Select
+                      value={form.transmission}
+                      onValueChange={v => updateField('transmission', v)}
+                      disabled={mode === 'view'}
+                    >
+                      <SelectTrigger id="transmission" className="mt-1">
+                        <SelectValue placeholder="Select transmission type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['Automatic', 'Manual', 'Semi-automatic', 'CVT'].map(type => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="number_of_doors">Number of Doors</Label>
+                    <Select
+                      value={form.number_of_doors}
+                      onValueChange={v => updateField('number_of_doors', v)}
+                      disabled={mode === 'view'}
+                    >
+                      <SelectTrigger id="number_of_doors" className="mt-1">
+                        <SelectValue placeholder="Select doors" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['2', '3', '4', '5'].map(doors => (
+                          <SelectItem key={doors} value={doors}>
+                            {doors}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="number_of_seats">Number of Seats</Label>
+                    <Select
+                      value={form.number_of_seats}
+                      onValueChange={v => updateField('number_of_seats', v)}
+                      disabled={mode === 'view'}
+                    >
+                      <SelectTrigger id="number_of_seats" className="mt-1">
+                        <SelectValue placeholder="Select seats" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['2', '4', '5', '6', '7', '8', '9'].map(seats => (
+                          <SelectItem key={seats} value={seats}>
+                            {seats}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="mt-8 flex justify-between">
+                  <Button
+                    variant="outline"
+                    onClick={() => setActiveTab("basic")}
+                  >
+                    Back
+                  </Button>
+                  {mode !== 'view' && (
+                    <Button onClick={() => setActiveTab("details")}>
+                      Continue
+                    </Button>
+                  )}
+                </div>
+              </TabsContent>
+
+              {/* Details & Images Tab */}
+              <TabsContent value="details" className="mt-0">
+                <div className="mb-6">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={form.description}
+                    onChange={e => updateField('description', e.target.value)}
+                    disabled={mode === 'view'}
+                    className="mt-1"
+                    rows={4}
+                  />
+                </div>
+
+                <div className="mb-6">
+                  <Label>Features</Label>
+                  {mode !== 'view' && (
+                    <div className="flex space-x-2 mt-1">
+                      <Input
+                        value={newFeature}
+                        onChange={e => setNewFeature(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleAddFeature()}
+                        placeholder="Add a feature"
+                        className="flex-1"
+                      />
+                      <Button 
+                        onClick={handleAddFeature}
+                        variant="secondary"
+                      >
+                        <Plus size={16} />
+                      </Button>
+                    </div>
+                  )}
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {form.features.length === 0 ? (
+                      <p className="text-gray-500 text-sm">No features added</p>
+                    ) : (
+                      form.features.map(feature => (
+                        <Badge key={feature} variant="secondary" className="flex items-center gap-1 py-1 px-2">
+                          {feature}
+                          {mode !== 'view' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-4 w-4 p-0 hover:bg-transparent"
+                              onClick={() => handleRemoveFeature(feature)}
+                            >
+                              <X size={12} />
+                            </Button>
+                          )}
+                        </Badge>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="mb-6">
+                  <Label>Images</Label>
+                  {mode !== 'view' && (
+                    <>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        id="imageUpload"
+                        className="hidden"
+                        onChange={handleImageUpload}
+                      />
+                      <div className="mt-1">
+                        <Button
+                          variant="outline"
+                          onClick={() => document.getElementById('imageUpload')!.click()}
+                          className="w-full py-15 border-dashed flex flex-col items-center"
+                        >
+                          <Upload className="h-8 w-8 mb-2 text-gray-400" />
+                          <span>Click to upload images</span>
+                          <p className="text-xs text-gray-500 mt-1">PNG, JPG up to 10MB</p>
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                  
+                  {form.previewUrls.length > 0 ? (
+                    <div className="mt-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {form.previewUrls.map((url, idx) => (
+                        <div key={idx} className="relative rounded-md overflow-hidden">
+                          <img
+                            src={url}
+                            alt={`Vehicle preview ${idx + 1}`}
+                            className="w-full h-28 object-cover"
+                          />
+                          {mode !== 'view' && (
+                            <Button
+                              variant="destructive"
+                              size="icon"
+                              className="absolute top-1 right-1 h-6 w-6 rounded-full"
+                              onClick={() => removeImage(idx)}
+                            >
+                              <X size={14} />
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-gray-500 text-sm mt-2">No images uploaded</p>
+                  )}
+                </div>
+
+                <div className="mt-8 flex justify-between">
+                  <Button
+                    variant="outline"
+                    onClick={() => setActiveTab("specs")}
+                  >
+                    Back
+                  </Button>
+                  {mode !== 'view' && (
+                    <Button 
+                      onClick={onSubmit} 
+                      disabled={adding || updating}
+                    >
+                      {(adding || updating) ? (
+                        <>
+                          <div className="animate-spin h-4 w-4 mr-2 border-2 border-b-transparent rounded-full"></div>
+                          {mode === 'add' ? 'Adding...' : 'Updating...'}
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2" /> 
+                          {mode === 'add' ? 'Add Vehicle Model' : 'Update Vehicle Model'}
+                        </>
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
         </div>
-    );
+      )}
+    </div>
+  );
 };
 
 export default VehicleModelManagement;
