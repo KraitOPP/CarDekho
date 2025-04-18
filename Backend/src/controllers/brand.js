@@ -6,7 +6,6 @@ async function addBrand(req, res) {
   try {
     const { brand_name } = req.body;
     const logoFile = req.files?.brand_logo?.[0];
-    console.log('Logo file:', logoFile);
 
     if (!brand_name) {
       return res.status(400).json({ error: 'Brand name is required' });
@@ -104,14 +103,12 @@ async function deleteBrand(req, res) {
     connection = await pool.getConnection();
     await connection.beginTransaction();
 
-    // Get brand logo before deletion
     const brandRows = await connection.query(
       `SELECT brand_logo FROM vehicle_brands WHERE id = ?`,
       [brandId]
     );
     const brandLogo = brandRows[0][0]?.brand_logo;
 
-    // Get all model IDs for the brand
     const [modelRows] = await connection.query(
       `SELECT id FROM vehicle_models WHERE brand_id = ?`,
       [brandId]
@@ -119,7 +116,6 @@ async function deleteBrand(req, res) {
     const modelIds = modelRows.map(row => row.id);
 
     if (modelIds.length > 0) {
-      // Get all vehicle IDs for those models
       const [vehicleRows] = await connection.query(
         `SELECT id FROM vehicles WHERE model_id IN (?)`,
         [modelIds]
@@ -127,26 +123,22 @@ async function deleteBrand(req, res) {
       const vehicleIds = vehicleRows.map(row => row.id);
 
       if (vehicleIds.length > 0) {
-        // Delete vehicle images
         await connection.query(
           `DELETE FROM vehicle_images WHERE vehicle_id IN (?)`,
           [vehicleIds]
         );
 
-        // Delete vehicles
         await connection.query(
           `DELETE FROM vehicles WHERE id IN (?)`,
           [vehicleIds]
         );
       }
 
-      // Delete model images
       await connection.query(
         `DELETE FROM vehicle_model_images WHERE model_id IN (?)`,
         [modelIds]
       );
 
-      // Delete models
       await connection.query(
         `DELETE FROM vehicle_models WHERE id IN (?)`,
         [modelIds]

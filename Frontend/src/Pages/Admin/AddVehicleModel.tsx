@@ -19,6 +19,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Link } from 'react-router';
+import { useGetBrandsQuery } from '@/slices/brandApiSlice';
 
 interface VehicleModel {
     brand: string;
