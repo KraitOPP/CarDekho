@@ -1,312 +1,470 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ChangeEvent } from 'react';
 import {
-    Save,
-    AlertCircle
+  Plus,
+  Save,
+  X,
+  Edit,
+  Trash2,
+  Eye,
+  ArrowLeft,
+  Upload
 } from 'lucide-react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Link } from 'react-router';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+  CardDescription
+} from '@/components/ui/card';
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Switch } from '@/components/ui/switch';
+import { toast } from 'sonner';
+import { useGetVehicleModelsQuery } from '@/slices/vehicleModelApiSlice';
+import {
+  useGetVehiclesQuery,
+  useAddVehicleMutation,
+  useUpdateVehicleMutation,
+  useDeleteVehicleMutation
+} from '@/slices/vehicleApiSlice';
 
-interface VehicleModel {
-    id: string;
-    brand: string;
-    model: string;
-    year: string;
+interface VehicleForm {
+  modelId: string;
+  registrationNumber: string;
+  licensePlate: string;
+  color: string;
+  mileage: string;
+  purchaseDate: string;
+  insuranceProvider: string;
+  insurancePolicyNumber: string;
+  insuranceExpiryDate: string;
+  insuranceDetails: string;
+  isAvailable: boolean;
+  images: File[];
+  previewUrls: string[];
 }
 
-interface Vehicle {
-    id?: string;
-    modelId: string;
-    registrationNumber: string;
-    licensePlate: string;
-    vin: string;
-    color: string;
-    mileage: string;
-    purchaseDate: string;
-    insurance: {
-        provider: string;
-        policyNumber: string;
-        expiryDate: string;
-        details: string;
-    };
-    isAvailable: boolean;
-}
+const VehicleManagement: React.FC = () => {
+  const { data: modelData, isLoading: loadingModels } = useGetVehicleModelsQuery();
+  const { data: vehicleData, refetch: refetchVehicles, isLoading: loadingVehicles } = useGetVehiclesQuery();
+  const [addVehicle, { isLoading: adding }] = useAddVehicleMutation();
+  const [updateVehicle, { isLoading: updating }] = useUpdateVehicleMutation();
+  const [deleteVehicle, { isLoading: deleting }] = useDeleteVehicleMutation();
 
-const AddVehicle: React.FC = () => {
-    // This would normally be fetched from your API
-    const [vehicleModels, setVehicleModels] = useState<VehicleModel[]>([
-        { id: '1', brand: 'Toyota', model: 'Corolla', year: '2023' },
-        { id: '2', brand: 'Honda', model: 'Civic', year: '2022' },
-        { id: '3', brand: 'Ford', model: 'Mustang', year: '2024' },
-    ]);
+  const vehicleModels = modelData || [];
+  const vehicles = Array.isArray(vehicleData) ? vehicleData : [];
 
-    const [vehicle, setVehicle] = useState<Vehicle>({
-        modelId: '',
-        registrationNumber: '',
-        licensePlate: '',
-        vin: '',
-        color: '',
-        mileage: '',
-        purchaseDate: '',
-        insurance: {
-            provider: '',
-            policyNumber: '',
-            expiryDate: '',
-            details: ''
-        },
-        isAvailable: true
+  const [mode, setMode] = useState<'list' | 'add' | 'edit' | 'view'>('list');
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'basic' | 'insurance' | 'details'>('basic');
+  const [form, setForm] = useState<VehicleForm>({
+    modelId: '',
+    registrationNumber: '',
+    licensePlate: '',
+    color: '',
+    mileage: '',
+    purchaseDate: '',
+    insuranceProvider: '',
+    insurancePolicyNumber: '',
+    insuranceExpiryDate: '',
+    insuranceDetails: '',
+    isAvailable: true,
+    images: [],
+    previewUrls: []
+  });
+
+  useEffect(() => {
+    if ((mode === 'edit' || mode === 'view') && selectedId !== null) {
+      const vehicle = vehicles.find(v => v.id === selectedId);
+      if (vehicle) {
+        setForm({
+          modelId: String(vehicle.model_id),
+          registrationNumber: vehicle.registration_no,
+          licensePlate: vehicle.plate_number,
+          color: vehicle.color,
+          mileage: String(vehicle.current_mileage),
+          purchaseDate: vehicle.purchase_date,
+          insuranceProvider: vehicle.insurance_provider,
+          insurancePolicyNumber: vehicle.insurance_policy_number,
+          insuranceExpiryDate: vehicle.insurance_expiry_date,
+          insuranceDetails: vehicle.insurance_detail || '',
+          isAvailable: vehicle.availability_status === 'available',
+          images: [],
+          previewUrls: vehicle.images || []
+        });
+      }
+    }
+  }, [mode, selectedId, vehicles]);
+
+  const updateField = <K extends keyof VehicleForm>(key: K, value: VehicleForm[K]) => {
+    setForm(prev => ({ ...prev, [key]: value }));
+  };
+
+  const updateInsuranceField = <K extends keyof Pick<VehicleForm,
+    'insuranceProvider' | 'insurancePolicyNumber' | 'insuranceExpiryDate' | 'insuranceDetails'>>(
+    key: K,
+    value: VehicleForm[K]
+  ) => updateField(key, value);
+
+  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    const newPreviews = files.map(f => URL.createObjectURL(f));
+    updateField('images', [...form.images, ...files]);
+    updateField('previewUrls', [...form.previewUrls, ...newPreviews]);
+  };
+
+  const removeImage = (index: number) => {
+    const imgs = [...form.images];
+    const previews = [...form.previewUrls];
+    imgs.splice(index, 1);
+    previews.splice(index, 1);
+    updateField('images', imgs);
+    updateField('previewUrls', previews);
+  };
+
+  const resetForm = () => {
+    setForm({
+      modelId: '',
+      registrationNumber: '',
+      licensePlate: '',
+      color: '',
+      mileage: '',
+      purchaseDate: '',
+      insuranceProvider: '',
+      insurancePolicyNumber: '',
+      insuranceExpiryDate: '',
+      insuranceDetails: '',
+      isAvailable: true,
+      images: [],
+      previewUrls: []
     });
+    setActiveTab('basic');
+  };
 
-    const [selectedModel, setSelectedModel] = useState<VehicleModel | null>(null);
+  const onSubmit = async () => {
+    try {
+      const payload = new FormData();
+      payload.append('model_id', form.modelId);
+      payload.append('registration_no', form.registrationNumber);
+      payload.append('plate_number', form.licensePlate);
+      payload.append('color', form.color);
+      payload.append('current_mileage', form.mileage);
+      payload.append('purchase_date', form.purchaseDate);
+      payload.append('availability_status', form.isAvailable ? 'available' : 'unavailable');
+      payload.append('insurance_provider', form.insuranceProvider);
+      payload.append('insurance_policy_number', form.insurancePolicyNumber);
+      payload.append('insurance_expiry_date', form.insuranceExpiryDate);
+      payload.append('insurance_detail', form.insuranceDetails);
+      
+      form.images.forEach(img => payload.append('images', img));
 
-    useEffect(() => {
-        // Update selected model when modelId changes
-        if (vehicle.modelId) {
-            const model = vehicleModels.find(m => m.id === vehicle.modelId) || null;
-            setSelectedModel(model);
-        } else {
-            setSelectedModel(null);
-        }
-    }, [vehicle.modelId, vehicleModels]);
+      if (mode === 'add') {
+        await addVehicle(payload).unwrap();
+        toast.success('Vehicle added successfully');
+        resetForm();
+      } else if (mode === 'edit' && selectedId !== null) {
+        await updateVehicle({ id: selectedId, payload }).unwrap();
+        toast.success('Vehicle updated successfully');
+      }
 
-    const handleSubmit = () => {
-        console.log('Individual Vehicle Data:', vehicle);
-        alert('Vehicle submitted/updated!');
-    };
+      refetchVehicles();
+      setMode('list');
+      setSelectedId(null);
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err?.data?.error || 'Operation failed');
+    }
+  };
 
-    const updateVehicleField = <K extends keyof Vehicle>(
-        field: K,
-        value: Vehicle[K]
-    ) => {
-        setVehicle(prev => ({
-            ...prev,
-            [field]: value
-        }));
-    };
+  const onDelete = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this vehicle?')) return;
+    try {
+      await deleteVehicle({ id }).unwrap(); 
+      toast.success('Vehicle deleted successfully');
+      refetchVehicles();
+    } catch {
+      toast.error('Failed to delete vehicle');
+    }
+  };
 
-    const updateInsuranceField = <K extends keyof Vehicle['insurance']>(
-        field: K,
-        value: Vehicle['insurance'][K]
-    ) => {
-        setVehicle(prev => ({
-            ...prev,
-            insurance: {
-                ...prev.insurance,
-                [field]: value
-            }
-        }));
-    };
-
-    return (
-        <div className="container mx-auto p-6">
-            <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold">Add Individual Vehicle</h1>
-                <div className="flex gap-3">
-                    <Link to={'/dashboard'}>
-                        <Button variant="outline">
-                            Back to Dashboard
-                        </Button>
-                    </Link>
-                    <Link to={'/vehicle-models/add'}>
-                        <Button>
-                            Add Vehicle Model
-                        </Button>
-                    </Link>
-                </div>
+  return (
+    <div className="container mx-auto py-6">
+      {mode === 'list' && (
+        <>
+          <div className="flex justify-between items-center mb-6">
+            <div>
+              <h1 className="text-3xl font-bold">Vehicles</h1>
+              <p className="text-gray-500 mt-1">Manage your fleet</p>
             </div>
+            <Button onClick={() => { resetForm(); setMode('add'); }}>
+              <Plus className="mr-2" /> Add Vehicle
+            </Button>
+          </div>
 
-            {vehicleModels.length === 0 && (
-                <Alert variant="destructive" className="mb-6">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertTitle>No vehicle models found</AlertTitle>
-                    <AlertDescription>
-                        You need to create a vehicle model before adding individual vehicles.
-                        <div className="mt-2">
-                            <Link to={'/vehicle-models/add'}>
-                                <Button variant="outline" size="sm">
-                                    Add Vehicle Model
-                                </Button>
-                            </Link>
-                        </div>
-                    </AlertDescription>
-                </Alert>
-            )}
-
-            <Card>
-                <CardContent className="p-6">
-                    <div className="mb-6">
-                        <h2 className="text-xl font-semibold mb-4">Vehicle Model Selection</h2>
-                        <div>
-                            <Label className="mb-2">Select Vehicle Model</Label>
-                            <Select
-                                value={vehicle.modelId}
-                                onValueChange={(value) => updateVehicleField('modelId', value)}
-                            >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Select a Vehicle Model" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {vehicleModels.map(model => (
-                                        <SelectItem key={model.id} value={model.id}>
-                                            {model.brand} {model.model} ({model.year})
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        {selectedModel && (
-                            <div className="mt-4 p-4 bg-slate-50 rounded-md">
-                                <p className="font-medium">Selected Model: {selectedModel.brand} {selectedModel.model}</p>
-                                <p className="text-sm text-slate-500">Year: {selectedModel.year}</p>
-                            </div>
-                        )}
+          {loadingVehicles ? (
+            <div className="flex justify-center p-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {vehicles.map(v => (
+                <Card key={v.id} className="overflow-hidden hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-2">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-xl">{v.registration_no}</CardTitle>
+                        <CardDescription>
+                          {/* Use the correct model properties */}
+                          {vehicleModels.find(m => m.id === v.model_id)?.model_name}
+                        </CardDescription>
+                      </div>
+                      <Badge variant={v.availability_status === 'available' ? 'success' : 'destructive'}>
+                        {v.availability_status}
+                      </Badge>
                     </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-500">Plate: {v.plate_number}</p>
+                    <p className="text-sm text-gray-500">Color: {v.color}</p>
+                    <p className="text-sm text-gray-500">Mileage: {v.current_mileage}</p>
 
-                    <div className="mb-6">
-                        <h2 className="text-xl font-semibold mb-4">Vehicle Information</h2>
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div>
-                                <Label className="mb-2">Registration Number*</Label>
-                                <Input
-                                    placeholder="Registration Number"
-                                    value={vehicle.registrationNumber}
-                                    onChange={(e) => updateVehicleField('registrationNumber', e.target.value)}
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <Label className="mb-2">License Plate*</Label>
-                                <Input
-                                    placeholder="License Plate"
-                                    value={vehicle.licensePlate}
-                                    onChange={(e) => updateVehicleField('licensePlate', e.target.value)}
-                                    required
-                                />
-                            </div>
-
-                            <div>
-                                <Label className="mb-2">VIN Number</Label>
-                                <Input
-                                    placeholder="Vehicle Identification Number"
-                                    value={vehicle.vin}
-                                    onChange={(e) => updateVehicleField('vin', e.target.value)}
-                                />
-                            </div>
-
-                            <div>
-                                <Label className="mb-2">Color</Label>
-                                <Input
-                                    placeholder="Vehicle Color"
-                                    value={vehicle.color}
-                                    onChange={(e) => updateVehicleField('color', e.target.value)}
-                                />
-                            </div>
-
-                            <div>
-                                <Label className="mb-2">Current Mileage</Label>
-                                <Input
-                                    type="number"
-                                    placeholder="Mileage in km/miles"
-                                    value={vehicle.mileage}
-                                    onChange={(e) => updateVehicleField('mileage', e.target.value)}
-                                />
-                            </div>
-
-                            <div>
-                                <Label className="mb-2">Purchase Date</Label>
-                                <Input
-                                    type="date"
-                                    value={vehicle.purchaseDate}
-                                    onChange={(e) => updateVehicleField('purchaseDate', e.target.value)}
-                                />
-                            </div>
-                        </div>
+                    <div className="flex space-x-2 mt-4">
+                      <Button size="sm" variant="outline" onClick={() => { setSelectedId(v.id); setMode('view'); }}>
+                        <Eye size={16} className="mr-1" /> View
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => { setSelectedId(v.id); setMode('edit'); }}>
+                        <Edit size={16} className="mr-1" /> Edit
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-red-500 hover:text-red-700" onClick={() => onDelete(v.id)} disabled={deleting}>
+                        <Trash2 size={16} className="mr-1" /> Delete
+                      </Button>
                     </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
-                    <div className="mb-6">
-                        <h2 className="text-xl font-semibold mb-4">Insurance Information</h2>
-                        <div className="grid md:grid-cols-2 gap-6">
-                            <div>
-                                <Label className="mb-2">Insurance Provider</Label>
-                                <Input
-                                    placeholder="Insurance Company"
-                                    value={vehicle.insurance.provider}
-                                    onChange={(e) => updateInsuranceField('provider', e.target.value)}
-                                />
-                            </div>
-
-                            <div>
-                                <Label className="mb-2">Policy Number</Label>
-                                <Input
-                                    placeholder="Insurance Policy Number"
-                                    value={vehicle.insurance.policyNumber}
-                                    onChange={(e) => updateInsuranceField('policyNumber', e.target.value)}
-                                />
-                            </div>
-
-                            <div>
-                                <Label className="mb-2">Expiry Date</Label>
-                                <Input
-                                    type="date"
-                                    value={vehicle.insurance.expiryDate}
-                                    onChange={(e) => updateInsuranceField('expiryDate', e.target.value)}
-                                />
-                            </div>
-
-                            <div className="md:col-span-2">
-                                <Label className="mb-2">Insurance Details</Label>
-                                <Textarea
-                                    placeholder="Coverage details, special notes, etc."
-                                    value={vehicle.insurance.details}
-                                    onChange={(e) => updateInsuranceField('details', e.target.value)}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="mb-6">
-                        <h2 className="text-xl font-semibold mb-4">Availability Status</h2>
-                        <div className="flex items-center space-x-2">
-                            <Switch
-                                checked={vehicle.isAvailable}
-                                onCheckedChange={(checked) => updateVehicleField('isAvailable', checked)}
-                            />
-                            <Label>Available for booking</Label>
-                        </div>
-                    </div>
-
-                    <div className="mt-6 flex justify-end space-x-4">
-                        <Button
-                            variant="outline"
-                            onClick={() => window.history.back()}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={handleSubmit}
-                            disabled={!vehicle.modelId || !vehicle.registrationNumber || !vehicle.licensePlate}
-                        >
-                            <Save className="mr-2" /> Save Vehicle
-                        </Button>
-                    </div>
-                </CardContent>
+          {!loadingVehicles && vehicles.length === 0 && (
+            <Card className="p-12 text-center">
+              <p className="text-gray-500 mb-4">No vehicles found</p>
+              <Button onClick={() => { resetForm(); setMode('add'); }}>Add Your First Vehicle</Button>
             </Card>
+          )}
+        </>
+      )}
+
+      {mode !== 'list' && (
+        <div className="bg-white rounded-lg shadow">
+          <div className="p-6 border-b">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <Button variant="ghost" size="icon" onClick={() => { setMode('list'); setSelectedId(null); }} className="mr-4">
+                  <ArrowLeft />
+                </Button>
+                <div>
+                  <h1 className="text-2xl font-bold">
+                    {mode === 'add' && 'Add Vehicle'}
+                    {mode === 'edit' && 'Edit Vehicle'}
+                    {mode === 'view' && 'Vehicle Details'}
+                  </h1>
+                  {mode === 'view' && selectedId !== null && (
+                    <p className="text-gray-500 mt-1">{form.registrationNumber}</p>
+                  )}
+                </div>
+              </div>
+              {mode === 'view' && (
+                <Button onClick={() => setMode('edit')} variant="outline">
+                  <Edit size={16} className="mr-2" /> Edit
+                </Button>
+              )}
+            </div>
+          </div>
+
+          <div className="p-6">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid grid-cols-3 mb-6">
+                <TabsTrigger value="basic">Basic</TabsTrigger>
+                <TabsTrigger value="insurance">Insurance</TabsTrigger>
+                <TabsTrigger value="details">Details & Images</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="basic" className="mt-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label>Vehicle Model</Label>
+                    <Select value={form.modelId} onValueChange={v => updateField('modelId', v)} disabled={mode === 'view'}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue placeholder={loadingModels ? 'Loading...' : 'Select model'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {/* Updated to match the backend response structure */}
+                        {vehicleModels.map(m => (
+                          <SelectItem key={m.id} value={String(m.id)}>
+                            {m.model_name} ({m.category})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Registration No</Label>
+                    <Input value={form.registrationNumber} onChange={e => updateField('registrationNumber', e.target.value)} disabled={mode === 'view'} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Plate Number</Label>
+                    <Input value={form.licensePlate} onChange={e => updateField('licensePlate', e.target.value)} disabled={mode === 'view'} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Color</Label>
+                    <Input value={form.color} onChange={e => updateField('color', e.target.value)} disabled={mode === 'view'} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Mileage</Label>
+                    <Input type="number" value={form.mileage} onChange={e => updateField('mileage', e.target.value)} disabled={mode === 'view'} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Purchase Date</Label>
+                    <Input type="date" value={form.purchaseDate} onChange={e => updateField('purchaseDate', e.target.value)} disabled={mode === 'view'} className="mt-1" />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch checked={form.isAvailable} onCheckedChange={c => updateField('isAvailable', c)} disabled={mode === 'view'} />
+                    <Label>Available</Label>
+                  </div>
+                </div>
+                <div className="mt-8 flex justify-between">
+                  <Button variant="outline" onClick={() => mode === 'add' ? (setMode('list'), setSelectedId(null)) : setActiveTab('details')}>
+                    {mode==='add'?'Cancel':'Back'}
+                  </Button>
+                  {mode!=='view' && <Button onClick={() => setActiveTab('insurance')}>Continue</Button>}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="insurance" className="mt-0">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label>Provider</Label>
+                    <Input value={form.insuranceProvider} onChange={e => updateInsuranceField('insuranceProvider', e.target.value)} disabled={mode==='view'} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Policy Number</Label>
+                    <Input value={form.insurancePolicyNumber} onChange={e => updateInsuranceField('insurancePolicyNumber', e.target.value)} disabled={mode==='view'} className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Expiry Date</Label>
+                    <Input type="date" value={form.insuranceExpiryDate} onChange={e => updateInsuranceField('insuranceExpiryDate', e.target.value)} disabled={mode==='view'} className="mt-1" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label>Details</Label>
+                    <Textarea value={form.insuranceDetails} onChange={e => updateInsuranceField('insuranceDetails', e.target.value)} disabled={mode==='view'} className="mt-1" rows={4} />
+                  </div>
+                </div>
+                <div className="mt-8 flex justify-between">
+                  <Button variant="outline" onClick={() => setActiveTab('basic')}>Back</Button>
+                  {mode!=='view' && <Button onClick={() => setActiveTab('details')}>Continue</Button>}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="details" className="mt-0">
+                <div>
+                  <Label>Images</Label>
+                  <div className="mt-2 mb-4">
+                    {mode !== 'view' && (
+                      <div className="flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg p-8 mb-4">
+                        <label className="flex flex-col items-center justify-center cursor-pointer">
+                          <Upload className="h-8 w-8 text-gray-500 mb-2" />
+                          <span className="text-sm text-gray-500">Upload images</span>
+                          <Input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
+                        </label>
+                      </div>
+                    )}
+
+                    {form.previewUrls.length > 0 ? (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        {form.previewUrls.map((url, i) => (
+                          <div key={i} className="relative rounded-lg overflow-hidden h-32">
+                            <img src={url} alt={`Vehicle ${i+1}`} className="w-full h-full object-cover" />
+                            {mode !== 'view' && (
+                              <button 
+                                className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                                onClick={() => removeImage(i)}
+                              >
+                                <X size={16} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 text-center py-4">No images uploaded</p>
+                    )}
+                  </div>
+
+                  <div className="mt-6">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-lg font-semibold">Selected Vehicle:</Label>
+                      <p>
+                        {/* Updated to match the backend model structure */}
+                        {vehicleModels.find(m => m.id === parseInt(form.modelId))?.model_name || ''} {' '}
+                        ({vehicleModels.find(m => m.id === parseInt(form.modelId))?.category || ''})
+                      </p>
+                    </div>
+
+                    <div className="mt-4 grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm text-gray-500">Registration No:</Label>
+                        <p>{form.registrationNumber}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm text-gray-500">License Plate:</Label>
+                        <p>{form.licensePlate}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm text-gray-500">Color:</Label>
+                        <p>{form.color}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm text-gray-500">Current Mileage:</Label>
+                        <p>{form.mileage}</p>
+                      </div>
+                      <div>
+                        <Label className="text-sm text-gray-500">Status:</Label>
+                        <Badge variant={form.isAvailable ? 'success' : 'destructive'}>
+                          {form.isAvailable ? 'Available' : 'Unavailable'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-8 flex justify-between">
+                  <Button variant="outline" onClick={() => setActiveTab('insurance')}>Back</Button>
+                  {mode !== 'view' && (
+                    <Button onClick={onSubmit} disabled={adding || updating}>
+                      <Save size={16} className="mr-2" />
+                      {mode === 'add' ? 'Add Vehicle' : 'Save Changes'}
+                    </Button>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
         </div>
-    );
+      )}
+    </div>
+  );
 };
 
-export default AddVehicle;
+export default VehicleManagement;

@@ -17,7 +17,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Quote } from "lucide-react";
 
-// Temporary car data
 const cars = [
   {
     id: 1,
