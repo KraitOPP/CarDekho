@@ -1,4 +1,4 @@
-const executeQuery = require('../db/db.js');
+const {executeQuery} = require('../db/db.js');
 
 async function addContactQuery(req, res) {
     try {
@@ -45,26 +45,29 @@ async function getContactQueryById(req, res) {
         res.status(500).json({ error: error.message });
     }
 }
-
-async function updateContactQueryResponse(req, res) {
+async function updateContactQueryStatus(req, res) {
     try {
         const { id } = req.params;
-        const { response } = req.body;
+        const { status } = req.body;
+
         
+
         const result = await executeQuery(
-            `UPDATE contact_queries SET response=?, status='responded', updated_at=NOW() WHERE id=?`, 
-            [response, id]
+            `UPDATE contact_queries SET status = ? WHERE id = ?`,
+            [status, id]
         );
-        
+
         if (result.affectedRows === 0) {
-            return res.status(404).json({ message: "Query not found or response unchanged" });
+            return res.status(404).json({ message: "Query not found" });
         }
-        
-        res.status(200).json({ message: "Response updated successfully." });
+
+        res.status(200).json({ message: `Query status updated to '${status}'.` });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 }
+
+
 
 async function deleteContactQuery(req, res) {
     try {
@@ -86,7 +89,7 @@ module.exports = {
     addContactQuery,
     getAllContactQueries,
     getPendingContactQueries,
+    updateContactQueryStatus,
     getContactQueryById,
-    updateContactQueryResponse,
     deleteContactQuery
 };
