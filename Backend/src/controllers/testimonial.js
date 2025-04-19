@@ -1,11 +1,9 @@
 const { executeQuery } = require('../db/db.js');
 
-// Add Testimonial (User)
 async function addTestimonial(req, res) {
     try {
         const { content, rating } = req.body;
         const user_id = req.user.id;
-        console.log(content,rating,user_id)
         if (!content || !rating || !user_id) {
             return res.status(400).json({ message: "Content, rating, and user ID are required." });
         }

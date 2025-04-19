@@ -38,6 +38,7 @@ import {
   useUpdateVehicleMutation,
   useDeleteVehicleMutation
 } from '@/slices/vehicleApiSlice';
+import { Link } from 'react-router';
 
 interface VehicleForm {
   modelId: string;
@@ -113,9 +114,9 @@ const VehicleManagement: React.FC = () => {
 
   const updateInsuranceField = <K extends keyof Pick<VehicleForm,
     'insuranceProvider' | 'insurancePolicyNumber' | 'insuranceExpiryDate' | 'insuranceDetails'>>(
-    key: K,
-    value: VehicleForm[K]
-  ) => updateField(key, value);
+      key: K,
+      value: VehicleForm[K]
+    ) => updateField(key, value);
 
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
@@ -167,7 +168,7 @@ const VehicleManagement: React.FC = () => {
       payload.append('insurance_policy_number', form.insurancePolicyNumber);
       payload.append('insurance_expiry_date', form.insuranceExpiryDate);
       payload.append('insurance_detail', form.insuranceDetails);
-      
+
       form.images.forEach(img => payload.append('images', img));
 
       if (mode === 'add') {
@@ -191,7 +192,7 @@ const VehicleManagement: React.FC = () => {
   const onDelete = async (id: number) => {
     if (!window.confirm('Are you sure you want to delete this vehicle?')) return;
     try {
-      await deleteVehicle({ id }).unwrap(); 
+      await deleteVehicle({ id }).unwrap();
       toast.success('Vehicle deleted successfully');
       refetchVehicles();
     } catch {
@@ -208,9 +209,21 @@ const VehicleManagement: React.FC = () => {
               <h1 className="text-3xl font-bold">Vehicles</h1>
               <p className="text-gray-500 mt-1">Manage your fleet</p>
             </div>
-            <Button onClick={() => { resetForm(); setMode('add'); }}>
-              <Plus className="mr-2" /> Add Vehicle
-            </Button>
+            <div className='flex items-center space-x-2'>
+              <Link to={'/dashboard/vehicle/brands'}>
+              <Button>
+                <Plus className="mr-2" /> Add Vehicle Brand
+              </Button>
+              </Link>
+              <Link to={'/dashboard/vehicle-model'}>
+              <Button>
+                <Plus className="mr-2" /> Add Vehicle Model
+              </Button>
+              </Link>
+              <Button onClick={() => { resetForm(); setMode('add'); }}>
+                <Plus className="mr-2" /> Add Vehicle
+              </Button>
+            </div>
           </div>
 
           {loadingVehicles ? (
@@ -346,9 +359,9 @@ const VehicleManagement: React.FC = () => {
                 </div>
                 <div className="mt-8 flex justify-between">
                   <Button variant="outline" onClick={() => mode === 'add' ? (setMode('list'), setSelectedId(null)) : setActiveTab('details')}>
-                    {mode==='add'?'Cancel':'Back'}
+                    {mode === 'add' ? 'Cancel' : 'Back'}
                   </Button>
-                  {mode!=='view' && <Button onClick={() => setActiveTab('insurance')}>Continue</Button>}
+                  {mode !== 'view' && <Button onClick={() => setActiveTab('insurance')}>Continue</Button>}
                 </div>
               </TabsContent>
 
@@ -356,24 +369,24 @@ const VehicleManagement: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <Label>Provider</Label>
-                    <Input value={form.insuranceProvider} onChange={e => updateInsuranceField('insuranceProvider', e.target.value)} disabled={mode==='view'} className="mt-1" />
+                    <Input value={form.insuranceProvider} onChange={e => updateInsuranceField('insuranceProvider', e.target.value)} disabled={mode === 'view'} className="mt-1" />
                   </div>
                   <div>
                     <Label>Policy Number</Label>
-                    <Input value={form.insurancePolicyNumber} onChange={e => updateInsuranceField('insurancePolicyNumber', e.target.value)} disabled={mode==='view'} className="mt-1" />
+                    <Input value={form.insurancePolicyNumber} onChange={e => updateInsuranceField('insurancePolicyNumber', e.target.value)} disabled={mode === 'view'} className="mt-1" />
                   </div>
                   <div>
                     <Label>Expiry Date</Label>
-                    <Input type="date" value={form.insuranceExpiryDate} onChange={e => updateInsuranceField('insuranceExpiryDate', e.target.value)} disabled={mode==='view'} className="mt-1" />
+                    <Input type="date" value={form.insuranceExpiryDate} onChange={e => updateInsuranceField('insuranceExpiryDate', e.target.value)} disabled={mode === 'view'} className="mt-1" />
                   </div>
                   <div className="md:col-span-2">
                     <Label>Details</Label>
-                    <Textarea value={form.insuranceDetails} onChange={e => updateInsuranceField('insuranceDetails', e.target.value)} disabled={mode==='view'} className="mt-1" rows={4} />
+                    <Textarea value={form.insuranceDetails} onChange={e => updateInsuranceField('insuranceDetails', e.target.value)} disabled={mode === 'view'} className="mt-1" rows={4} />
                   </div>
                 </div>
                 <div className="mt-8 flex justify-between">
                   <Button variant="outline" onClick={() => setActiveTab('basic')}>Back</Button>
-                  {mode!=='view' && <Button onClick={() => setActiveTab('details')}>Continue</Button>}
+                  {mode !== 'view' && <Button onClick={() => setActiveTab('details')}>Continue</Button>}
                 </div>
               </TabsContent>
 
@@ -395,9 +408,9 @@ const VehicleManagement: React.FC = () => {
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                         {form.previewUrls.map((url, i) => (
                           <div key={i} className="relative rounded-lg overflow-hidden h-32">
-                            <img src={url} alt={`Vehicle ${i+1}`} className="w-full h-full object-cover" />
+                            <img src={url} alt={`Vehicle ${i + 1}`} className="w-full h-full object-cover" />
                             {mode !== 'view' && (
-                              <button 
+                              <button
                                 className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
                                 onClick={() => removeImage(i)}
                               >

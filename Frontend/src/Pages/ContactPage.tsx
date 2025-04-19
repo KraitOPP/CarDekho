@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Clock, MapPin, Phone, Mail, Linkedin, Twitter, Facebook } from "lucide-react";
+import { useAddContactQueryMutation } from "@/slices/contactApiSlice";
+import { toast } from "sonner";
 
 // Define interfaces for configuration
 interface Location {
@@ -72,9 +74,15 @@ const ContactForm: React.FC = () => {
     additionalInfo: 'We are committed to providing excellent customer service.'
   });
 
+  // Add the toast hook for notifications
+  
+  // Add the mutation hook
+  const [addContactQuery, { isLoading }] = useAddContactQueryMutation();
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    phone_number: "", // Added for the backend schema
     subject: "",
     message: ""
   });
@@ -89,9 +97,34 @@ const ContactForm: React.FC = () => {
     }));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("Form submitted:", formData);
+    
+    try {
+      // Call the mutation with the form data
+      const response = await addContactQuery(formData).unwrap();
+      
+      // Show success message
+      toast.success("Message Sent!",{
+        description: response.message || "Your query has been submitted successfully.",
+        duration: 5000,
+      });
+      
+      // Reset form fields
+      setFormData({
+        name: "",
+        email: "",
+        phone_number: "",
+        subject: "",
+        message: ""
+      });
+    } catch (error) {
+      // Show error message
+      toast.error("Error",{
+        description: error.data?.error || "Failed to submit your query. Please try again.",
+        duration: 5000,
+      });
+    }
   };
 
   const socialIcons = {
@@ -206,6 +239,7 @@ const ContactForm: React.FC = () => {
                   className="mt-1 block w-full"
                   value={formData.name}
                   onChange={handleInputChange}
+                  required
                 />
               </div>
               <div>
@@ -219,10 +253,23 @@ const ContactForm: React.FC = () => {
                   className="mt-1 block w-full"
                   value={formData.email}
                   onChange={handleInputChange}
+                  required
                 />
               </div>
               <div>
-                <Label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <Label htmlFor="phone_number" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Phone
+                </Label>
+                <Input 
+                  id="phone_number" 
+                  placeholder="Enter your phone number" 
+                  className="mt-1 block w-full"
+                  value={formData.phone_number}
+                  onChange={handleInputChange}
+                />
+              </div>
+              <div>
+                <Label htmlFor="subject" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Subject
                 </Label>
                 <Input 
@@ -231,6 +278,7 @@ const ContactForm: React.FC = () => {
                   className="mt-1 block w-full"
                   value={formData.subject}
                   onChange={handleInputChange}
+                  required
                 />
               </div>
               <div>
@@ -243,13 +291,15 @@ const ContactForm: React.FC = () => {
                   className="mt-1 block w-full min-h-[120px]"
                   value={formData.message}
                   onChange={handleInputChange}
+                  required
                 />
               </div>
               <Button 
                 type="submit" 
                 className="w-full bg-black hover:bg-gray-800 text-white py-2 px-4 rounded"
+                disabled={isLoading}
               >
-                Send Message
+                {isLoading ? "Sending..." : "Send Message"}
               </Button>
             </form>
           </CardContent>

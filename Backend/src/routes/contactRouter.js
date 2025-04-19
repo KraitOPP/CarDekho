@@ -9,6 +9,6 @@ router.get('/pending', verifyJWT, isAdmin, getPendingContactQueries);
 router.get('/all', verifyJWT, isAdmin, getAllContactQueries);  
 router.get('/:id', verifyJWT, isAdmin, getContactQueryById);  
 router.put('/update-status/:id', verifyJWT, isAdmin, updateContactQueryStatus);  
-router.delete('/delete/:id', verifyJWT, isAdmin, deleteContactQuery);  
+router.delete('/delete/:id', verifyJWT, isAdmin, deleteContactQuery);
 
 module.exports ={router};
