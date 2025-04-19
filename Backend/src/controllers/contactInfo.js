@@ -80,6 +80,36 @@ async function updateContactInfo(req, res) {
   }
 }
 
+
+async function getContactInfo(req, res) {
+  try {
+    const query = `SELECT 
+      id, company_name, main_email, support_email, main_phone,
+      office_address, facebook_url, instagram_url, linkedin_url,
+      updated_by, updated_at, working_days
+    FROM contact_info
+    WHERE id = 1`;
+
+    const result = await executeQuery(query);
+
+    if (result.length === 0) {
+      return res.status(404).json({ message: 'Contact info not found' });
+    }
+
+    // Parse JSON field
+    const contactInfo = result[0];
+    console.log(contactInfo);
+   
+
+    return res.status(200).json({ contact_info: contactInfo });
+  } catch (error) {
+    console.error('Error fetching contact info:', error.message);
+    res.status(500).json({ message: 'Error fetching contact info', error: error.message });
+  }
+}
+
+
+
 module.exports = {
-  updateContactInfo
+  updateContactInfo,getContactInfo
 };
