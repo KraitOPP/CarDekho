@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Search, 
   Eye, 
@@ -45,60 +45,47 @@ import {
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 import { Card } from "@/components/ui/card";
+import { toast } from "sonner";
 
-type QueryStatus = 'new' | 'in-progress' | 'resolved' | 'closed';
+import {
+  useGetContactQueriesQuery,
+  useUpdateContactQueryStatusMutation,
+  useDeleteContactQueryMutation
+} from '@/slices/contactApiSlice';
+
+// Updated to match backend status values
+type QueryStatus = 'pending' | 'in-progress' | 'resolved' | 'closed';
 
 interface ContactQuery {
   id: number;
   name: string;
   email: string;
-  phone?: string;
+  phone_number?: string;
   subject: string;
   message: string;
   status: QueryStatus;
-  receivedAt: string;
-  replies?: Reply[];
-}
-
-interface Reply {
-  id: number;
-  adminName: string;
-  message: string;
-  sentAt: string;
+  created_at: string;
+  replies?: {
+    id: number;
+    adminName: string;
+    message: string;
+    sentAt: string;
+  }[];
 }
 
 const ContactManagement: React.FC = () => {
-  const [queries, setQueries] = useState<ContactQuery[]>([
-    {
-      id: 1,
-      name: 'Sarah Johnson',
-      email: 'sarah.j@example.com',
-      phone: '+1 (555) 123-4567',
-      subject: 'Product Inquiry',
-      message: 'I would like to know more about your latest product features.',
-      status: 'new',
-      receivedAt: '2024-03-25T10:30:00Z',
-      replies: []
-    },
-    {
-      id: 2,
-      name: 'Michael Chen',
-      email: 'michael.chen@example.com',
-      subject: 'Technical Support',
-      message: 'I am experiencing issues with my recent purchase.',
-      status: 'in-progress',
-      receivedAt: '2024-03-24T15:45:00Z',
-      replies: [
-        {
-          id: 1,
-          adminName: 'Support Team',
-          message: 'We are investigating your issue and will get back to you soon.',
-          sentAt: '2024-03-25T11:15:00Z'
-        }
-      ]
-    }
-  ]);
+  const {
+    data: apiData,
+    isLoading,
+    isError,
+    refetch
+  } = useGetContactQueriesQuery();
+  const [updateContactQueryStatus, { isLoading: isUpdating }] =
+    useUpdateContactQueryStatusMutation();
+  const [deleteContactQuery, { isLoading: isDeleting }] =
+    useDeleteContactQueryMutation();
 
+  const [queries, setQueries] = useState<ContactQuery[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<QueryStatus | 'all'>('all');
   const [selectedQuery, setSelectedQuery] = useState<ContactQuery | null>(null);
@@ -107,17 +94,29 @@ const ContactManagement: React.FC = () => {
   const [deleteQueryId, setDeleteQueryId] = useState<number | null>(null);
   const [replyMessage, setReplyMessage] = useState('');
 
+  useEffect(() => {
+    if (apiData) {
+      // Map directly from the API data structure without field conversion
+      const mapped = apiData.map(item => ({
+        ...item,
+        replies: item.replies || []
+      }));
+      setQueries(mapped);
+    }
+  }, [apiData]);
+
+  // Updated status color map to match backend statuses
   const statusColorMap = {
-    'new': 'secondary',
+    pending: 'secondary',
     'in-progress': 'warning',
-    'resolved': 'success',
-    'closed': 'destructive'
-  };
+    resolved: 'success',
+    closed: 'destructive'
+  } as const;
 
   const filteredQueries = useMemo(() => {
-    return queries.filter(query => 
+    return queries.filter(query =>
       (statusFilter === 'all' || query.status === statusFilter) &&
-      (searchQuery === '' || 
+      (searchQuery === '' ||
         query.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         query.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
         query.subject.toLowerCase().includes(searchQuery.toLowerCase()))
@@ -126,84 +125,94 @@ const ContactManagement: React.FC = () => {
 
   const handleReplyToQuery = () => {
     if (selectedQuery && replyMessage.trim()) {
-      const newReply: Reply = {
+      const newReply = {
         id: (selectedQuery.replies?.length || 0) + 1,
         adminName: 'Support Admin',
         message: replyMessage,
         sentAt: new Date().toISOString()
       };
-
-      const updatedQueries = queries.map(query => 
-        query.id === selectedQuery.id 
-          ? { 
-              ...query, 
-              status: 'in-progress', 
-              replies: [...(query.replies || []), newReply] 
-            } 
-          : query
-      );
-
-      setQueries(updatedQueries);
+      
+      // Update the status to in-progress when replying
+      updateQueryStatus('in-progress');
+      
+      setQueries(queries.map(q =>
+        q.id === selectedQuery.id
+          ? { ...q, status: 'in-progress' as QueryStatus, replies: [...(q.replies || []), newReply] }
+          : q
+      ));
       setIsReplyOpen(false);
       setSelectedQuery(null);
       setReplyMessage('');
+      toast.success('Reply added');
     }
   };
 
-  const handleDeleteQuery = () => {
-    if (deleteQueryId) {
-      setQueries(queries.filter(query => query.id !== deleteQueryId));
-      setDeleteQueryId(null);
-    }
-  };
-
-  const updateQueryStatus = (status: QueryStatus) => {
-    if (selectedQuery) {
-      setQueries(queries.map(query => 
-        query.id === selectedQuery.id 
-          ? { ...query, status } 
-          : query
-      ));
+  const updateQueryStatus = async (newStatus: QueryStatus) => {
+    if (!selectedQuery) return;
+    try {
+      await updateContactQueryStatus({
+        id: selectedQuery.id,
+        payload: { status: newStatus }
+      }).unwrap();
+      toast.success(`Status updated to "${newStatus}"`);
+      refetch();
+    } catch (err: any) {
+      toast.error(err.data?.message || 'Failed to update status');
+    } finally {
       setIsDetailsOpen(false);
       setSelectedQuery(null);
     }
   };
 
+  const handleDeleteQuery = async () => {
+    if (!deleteQueryId) return;
+    try {
+      await deleteContactQuery(deleteQueryId).unwrap();
+      toast.success('Query deleted');
+      refetch();
+    } catch (err: any) {
+      toast.error(err.data?.message || 'Failed to delete query');
+    } finally {
+      setDeleteQueryId(null);
+    }
+  };
+
+  if (isLoading) return <p>Loading...</p>;
+  if (isError) return <p className="text-red-500">Error loading queries.</p>;
+
   return (
     <div className="container mx-auto p-6">
-      {/* Page Header */}
+      {/* Page Header + Filters */}
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Contact Queries</h1>
-        
-        {/* Filters */}
         <div className="flex items-center space-x-4">
-          {/* Search Input */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input 
-              placeholder="Search queries..." 
+            <Input
+              placeholder="Search queries..."
               className="pl-10 w-[250px]"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-
-          {/* Status Filter */}
-          <Select 
-            value={statusFilter} 
-            onValueChange={(value) => setStatusFilter(value as QueryStatus | 'all')}
+          <Select
+            value={statusFilter}
+            onValueChange={(value) =>
+              setStatusFilter(value as QueryStatus | 'all')
+            }
           >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Filter by Status">
-                {statusFilter === 'all' ? 'All Queries' : `${statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Queries`}
+                {statusFilter === 'all'
+                  ? 'All Queries'
+                  : `${statusFilter.charAt(0).toUpperCase() +
+                      statusFilter.slice(1)} Queries`}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Queries</SelectItem>
-              <SelectItem value="new">New</SelectItem>
-              <SelectItem value="in-progress">In Progress</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="resolved">Resolved</SelectItem>
-              <SelectItem value="closed">Closed</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -231,17 +240,18 @@ const ContactManagement: React.FC = () => {
                   <TableCell>{query.subject}</TableCell>
                   <TableCell>
                     <Badge variant={statusColorMap[query.status]}>
-                      {query.status.charAt(0).toUpperCase() + query.status.slice(1)}
+                      {query.status.charAt(0).toUpperCase() +
+                        query.status.slice(1)}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {new Date(query.receivedAt).toLocaleString()}
+                    {new Date(query.created_at).toLocaleString()}
                   </TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => {
                           setSelectedQuery(query);
                           setIsDetailsOpen(true);
@@ -249,9 +259,9 @@ const ContactManagement: React.FC = () => {
                       >
                         <Eye className="mr-2 w-4 h-4" /> View
                       </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => {
                           setSelectedQuery(query);
                           setIsReplyOpen(true);
@@ -259,9 +269,9 @@ const ContactManagement: React.FC = () => {
                       >
                         <Reply className="mr-2 w-4 h-4" /> Reply
                       </Button>
-                      <Button 
-                        variant="destructive" 
-                        size="sm" 
+                      <Button
+                        variant="destructive"
+                        size="sm"
                         onClick={() => setDeleteQueryId(query.id)}
                       >
                         <Trash2 className="w-4 h-4" />
@@ -290,7 +300,7 @@ const ContactManagement: React.FC = () => {
               Detailed information about the contact query
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedQuery && (
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
@@ -301,33 +311,36 @@ const ContactManagement: React.FC = () => {
                 <p className="font-bold">Email:</p>
                 <p className="col-span-3">{selectedQuery.email}</p>
               </div>
-              {selectedQuery.phone && (
+              {selectedQuery.phone_number && (
                 <div className="grid grid-cols-4 items-center gap-4">
                   <p className="font-bold">Phone:</p>
-                  <p className="col-span-3">{selectedQuery.phone}</p>
+                  <p className="col-span-3">{selectedQuery.phone_number}</p>
                 </div>
               )}
               <div className="grid grid-cols-4 items-center gap-4">
                 <p className="font-bold">Subject:</p>
                 <p className="col-span-3">{selectedQuery.subject}</p>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
+              <div className="grid grid-cols-4 items-start gap-4">
                 <p className="font-bold">Message:</p>
-                <p className="col-span-3">{selectedQuery.message}</p>
+                <div className="col-span-3 whitespace-pre-wrap border p-3 rounded-md bg-muted/50">
+                  {selectedQuery.message}
+                </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <p className="font-bold">Status:</p>
                 <Badge variant={statusColorMap[selectedQuery.status]} className="col-span-3">
-                  {selectedQuery.status.charAt(0).toUpperCase() + selectedQuery.status.slice(1)}
+                  {selectedQuery.status.charAt(0).toUpperCase() +
+                    selectedQuery.status.slice(1)}
                 </Badge>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <p className="font-bold">Received:</p>
                 <p className="col-span-3">
-                  {new Date(selectedQuery.receivedAt).toLocaleString()}
+                  {new Date(selectedQuery.created_at).toLocaleString()}
                 </p>
               </div>
-              
+
               {/* Replies Section */}
               {selectedQuery.replies && selectedQuery.replies.length > 0 && (
                 <div className="mt-4">
@@ -345,27 +358,15 @@ const ContactManagement: React.FC = () => {
                   ))}
                 </div>
               )}
-              
+
               {/* Status Update Buttons */}
               <DialogFooter className="mt-4">
                 <div className="flex space-x-2">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => updateQueryStatus('in-progress')}
-                  >
+                  <Button variant="outline" onClick={() => updateQueryStatus('pending')}>
                     Mark In Progress
                   </Button>
-                  <Button 
-                    variant="success" 
-                    onClick={() => updateQueryStatus('resolved')}
-                  >
+                  <Button variant="outline" onClick={() => updateQueryStatus('resolved')}>
                     Mark Resolved
-                  </Button>
-                  <Button 
-                    variant="destructive" 
-                    onClick={() => updateQueryStatus('closed')}
-                  >
-                    Close Query
                   </Button>
                 </div>
               </DialogFooter>
@@ -383,16 +384,20 @@ const ContactManagement: React.FC = () => {
               Respond to the customer's query
             </DialogDescription>
           </DialogHeader>
-          
+
           {selectedQuery && (
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
-                <p className="font-bold">To:</p>
-                <p className="col-span-3">{selectedQuery.name} ({selectedQuery.email})</p>
+                <label htmlFor="to" className="text-right">To:</label>
+                <div className="col-span-3">
+                  <p className="font-medium">{selectedQuery.name} ({selectedQuery.email})</p>
+                </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <p className="font-bold">Subject:</p>
-                <p className="col-span-3">Re: {selectedQuery.subject}</p>
+                <label htmlFor="subject" className="text-right">Subject:</label>
+                <div className="col-span-3">
+                  <p className="font-medium">Re: {selectedQuery.subject}</p>
+                </div>
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <label htmlFor="replyMessage" className="text-right">Message:</label>
@@ -405,8 +410,8 @@ const ContactManagement: React.FC = () => {
                 />
               </div>
               <DialogFooter>
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   onClick={handleReplyToQuery}
                   disabled={!replyMessage.trim()}
                 >
@@ -418,22 +423,21 @@ const ContactManagement: React.FC = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Query Confirmation */}
-      <AlertDialog 
-        open={deleteQueryId !== null} 
+      {/* Delete Confirmation */}
+      <AlertDialog
+        open={deleteQueryId !== null}
         onOpenChange={() => setDeleteQueryId(null)}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Query</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this query? 
-              This action cannot be undone.
+              Are you sure you want to delete this query? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteQuery}>
+            <AlertDialogAction onClick={handleDeleteQuery} disabled={isDeleting}>
               Delete Query
             </AlertDialogAction>
           </AlertDialogFooter>

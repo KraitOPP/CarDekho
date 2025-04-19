@@ -2,6 +2,7 @@ const {executeQuery} = require('../db/db.js');
 
 async function addContactQuery(req, res) {
     try {
+        console.log(req.body);
         const { name, email, phone_number, subject, message } = req.body;
         await executeQuery(
             `INSERT INTO contact_queries (name, email, phone_number, subject, message, status) VALUES (?, ?, ?, ?, ?, 'pending')`,

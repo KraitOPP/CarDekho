@@ -506,10 +506,6 @@ export default function ProfilePage(){
                                             </li>
                                             <li className="flex items-start">
                                                 <span className="mr-2 text-green-600">•</span>
-                                                <span>Enable two-factor authentication for additional security</span>
-                                            </li>
-                                            <li className="flex items-start">
-                                                <span className="mr-2 text-green-600">•</span>
                                                 <span>Never share your password or security codes with anyone</span>
                                             </li>
                                             <li className="flex items-start">

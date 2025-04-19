@@ -35,7 +35,7 @@ export const router = createBrowserRouter([
         element: <HomePage />
       },
       {
-        path:"/car/:id",
+        path:"/vehicle/:id",
         element: <CarBookingPage />
       },
       {

@@ -37,105 +37,91 @@ import {
   AlertDialogTitle
 } from "@/components/ui/alert-dialog";
 import { Link } from 'react-router';
+import { toast } from "sonner";
+import {
+  useGetTestimonialsQuery,
+  useUpdateTestimonialMutation,
+  useDeleteTestimonialMutation
+} from '@/slices/testimonialApiSlice';
 
 interface Testimonial {
   id: number;
   name: string;
   email: string;
   content: string;
-  rating: number; // Rating out of 5
-  isActive: boolean;
+  rating: number;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  user_id: number;
 }
 
 const TestimonialManagement: React.FC = () => {
-  const [testimonials, setTestimonials] = useState<Testimonial[]>([
-    {
-      id: 1,
-      name: 'John Doe',
-      email: 'john.doe@example.com',
-      content: 'An incredible service that transformed our business operations.',
-      rating: 4.5,
-      isActive: true
-    },
-    {
-      id: 2,
-      name: 'Jane Smith',
-      email: 'jane.smith@globalsolutions.com',
-      content: 'Exceptional support and remarkable results.',
-      rating: 5,
-      isActive: false
-    },
-    {
-      id: 3,
-      name: 'Robert Johnson',
-      email: 'robert.j@techcorp.com',
-      content: 'Good service but could improve response times.',
-      rating: 3.5,
-      isActive: true
-    }
-  ]);
+  const {
+    data: dataResponse,
+    isLoading,
+    isError,
+    refetch
+  } = useGetTestimonialsQuery();
+
+  const testimonials: Testimonial[] = dataResponse?.testimonials || [];
+  const [updateTestimonial, { isLoading: isUpdating }] = useUpdateTestimonialMutation();
+  const [deleteTestimonial, { isLoading: isDeleting }] = useDeleteTestimonialMutation();
 
   const [testimonialToDelete, setTestimonialToDelete] = useState<Testimonial | null>(null);
   const [viewTestimonial, setViewTestimonial] = useState<Testimonial | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
 
-  const handleToggleStatus = (id: number) => {
-    setTestimonials(testimonials.map(testimonial => 
-      testimonial.id === id 
-        ? { ...testimonial, isActive: !testimonial.isActive }
-        : testimonial
-    ));
-  };
+  const isActive = (status: string) => status === 'active';
 
-  const handleDeleteTestimonial = () => {
-    if (testimonialToDelete) {
-      setTestimonials(testimonials.filter(testimonial => testimonial.id !== testimonialToDelete.id));
-      setTestimonialToDelete(null);
+  const handleToggleStatus = async (t: Testimonial) => {
+    const newStatus = isActive(t.status) ? 'inactive' : 'active';
+    try {
+      await updateTestimonial({ id: t.id, payload: { status: newStatus } }).unwrap();
+      toast.success(`Testimonial marked as ${newStatus}`);
+      refetch();
+    } catch (err: any) {
+      toast.error(err.data?.message || 'Failed to update status');
     }
   };
 
-  const handleViewDetails = (testimonial: Testimonial) => {
-    setViewTestimonial({...testimonial});
+  const handleDeleteTestimonial = async () => {
+    if (!testimonialToDelete) return;
+    try {
+      await deleteTestimonial({ _id: testimonialToDelete.id }).unwrap();
+      toast.success('Testimonial deleted successfully');
+      setTestimonialToDelete(null);
+      refetch();
+    } catch (err: any) {
+      toast.error(err.data?.message || 'Failed to delete testimonial');
+    }
+  };
+
+  const handleViewDetails = (t: Testimonial) => {
+    setViewTestimonial(t);
     setIsViewDialogOpen(true);
   };
 
-  // Function to render star rating
   const renderStarRating = (rating: number) => {
     const stars = [];
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 !== 0;
-    
-    // Add full stars
+
     for (let i = 0; i < fullStars; i++) {
       stars.push(
-        <Star 
-          key={`star-${i}`} 
-          className="w-4 h-4 fill-yellow-400 text-yellow-400" 
-        />
+        <Star key={`star-${i}`} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
       );
     }
-    
-    // Add half star if needed
     if (hasHalfStar) {
       stars.push(
-        <StarHalf 
-          key="half-star" 
-          className="w-4 h-4 fill-yellow-400 text-yellow-400" 
-        />
+        <StarHalf key="half-star" className="w-4 h-4 fill-yellow-400 text-yellow-400" />
       );
     }
-    
-    // Add empty stars
-    const emptyStars = 5 - Math.ceil(rating);
-    for (let i = 0; i < emptyStars; i++) {
+    for (let i = 0; i < 5 - Math.ceil(rating); i++) {
       stars.push(
-        <Star 
-          key={`empty-star-${i}`} 
-          className="w-4 h-4 text-gray-300" 
-        />
+        <Star key={`empty-star-${i}`} className="w-4 h-4 text-gray-300" />
       );
     }
-    
     return (
       <div className="flex items-center">
         <div className="flex mr-1">{stars}</div>
@@ -143,6 +129,17 @@ const TestimonialManagement: React.FC = () => {
       </div>
     );
   };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  if (isLoading) return <p>Loading testimonials...</p>;
+  if (isError) return <p className="text-red-500">Error loading testimonials.</p>;
 
   return (
     <div className="container mx-auto p-6">
@@ -156,37 +153,31 @@ const TestimonialManagement: React.FC = () => {
       </div>
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {testimonials.map((testimonial) => (
-          <Card key={testimonial.id} className="shadow-sm">
+        {testimonials.map((t) => (
+          <Card key={t.id} className="shadow-sm">
             <CardHeader className="pb-2">
               <div className="flex justify-between items-center">
-                <CardTitle className="text-lg">{testimonial.name}</CardTitle>
-                <Badge 
-                  variant={testimonial.isActive ? 'default' : 'secondary'}
-                  className="flex items-center"
-                >
-                  {testimonial.isActive ? 'Active' : 'Inactive'}
+                <CardTitle className="text-lg">{t.name}</CardTitle>
+                <Badge variant={isActive(t.status) ? 'default' : 'secondary'} className="flex items-center">
+                  {t.status}
                 </Badge>
               </div>
               <p className="text-sm text-muted-foreground flex items-center">
-                <Mail className="mr-1 w-4 h-4" /> {testimonial.email}
+                <Mail className="mr-1 w-4 h-4" /> {t.email}
               </p>
-              <div className="mt-1">
-                {renderStarRating(testimonial.rating)}
-              </div>
+              <div className="mt-1">{renderStarRating(t.rating)}</div>
             </CardHeader>
             <CardContent>
-              <p className="mb-4 text-sm line-clamp-3">{testimonial.content}</p>
-              
+              <p className="mb-4 text-sm line-clamp-3">{t.content}</p>
               <div className="flex justify-between items-center">
                 <div className="flex items-center space-x-2">
                   <span className="text-sm">Status</span>
                   <Switch
-                    checked={testimonial.isActive}
-                    onCheckedChange={() => handleToggleStatus(testimonial.id)}
+                    checked={isActive(t.status)}
+                    onCheckedChange={() => handleToggleStatus(t)}
+                    disabled={isUpdating}
                   />
                 </div>
-                
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="icon">
@@ -194,19 +185,14 @@ const TestimonialManagement: React.FC = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem 
-                      onSelect={() => handleViewDetails(testimonial)}
-                      className="cursor-pointer"
-                    >
-                      <MessageSquare className="mr-2 w-4 h-4" />
-                      View Details
+                    <DropdownMenuItem onSelect={() => handleViewDetails(t)} className="cursor-pointer">
+                      <MessageSquare className="mr-2 w-4 h-4" /> View Details
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onSelect={() => setTestimonialToDelete(testimonial)}
+                    <DropdownMenuItem
+                      onSelect={() => setTestimonialToDelete(t)}
                       className="cursor-pointer text-destructive focus:text-destructive"
                     >
-                      <Trash2 className="mr-2 w-4 h-4" />
-                      Delete
+                      <Trash2 className="mr-2 w-4 h-4" /> Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -222,7 +208,6 @@ const TestimonialManagement: React.FC = () => {
           <DialogHeader>
             <DialogTitle>Testimonial Details</DialogTitle>
           </DialogHeader>
-          
           <div className="space-y-4 py-4">
             <div className="flex items-center gap-2">
               <User className="w-5 h-5 text-muted-foreground" />
@@ -231,7 +216,6 @@ const TestimonialManagement: React.FC = () => {
                 <p>{viewTestimonial?.name}</p>
               </div>
             </div>
-            
             <div className="flex items-center gap-2">
               <Mail className="w-5 h-5 text-muted-foreground" />
               <div>
@@ -239,7 +223,6 @@ const TestimonialManagement: React.FC = () => {
                 <p>{viewTestimonial?.email}</p>
               </div>
             </div>
-
             <div className="flex items-center gap-2">
               <Star className="w-5 h-5 text-muted-foreground" />
               <div>
@@ -247,7 +230,6 @@ const TestimonialManagement: React.FC = () => {
                 {viewTestimonial && renderStarRating(viewTestimonial.rating)}
               </div>
             </div>
-            
             <div className="flex items-start gap-2">
               <MessageSquare className="w-5 h-5 text-muted-foreground mt-1" />
               <div>
@@ -255,19 +237,20 @@ const TestimonialManagement: React.FC = () => {
                 <p className="whitespace-pre-wrap">{viewTestimonial?.content}</p>
               </div>
             </div>
-            
             <div className="flex items-center gap-2">
-              <Badge variant={viewTestimonial?.isActive ? 'default' : 'secondary'}>
-                {viewTestimonial?.isActive ? 'Active' : 'Inactive'}
+              <Badge variant={viewTestimonial?.status === 'active' ? 'default' : 'secondary'}>
+                {viewTestimonial?.status}
               </Badge>
             </div>
+            {viewTestimonial && (
+              <div className="text-sm text-muted-foreground">
+                <p>Created: {formatDate(viewTestimonial.created_at)}</p>
+                <p>Last updated: {formatDate(viewTestimonial.updated_at)}</p>
+              </div>
+            )}
           </div>
-          
           <DialogFooter>
-            <Button 
-              type="button" 
-              onClick={() => setIsViewDialogOpen(false)}
-            >
+            <Button type="button" onClick={() => setIsViewDialogOpen(false)}>
               Close
             </Button>
           </DialogFooter>
@@ -275,8 +258,8 @@ const TestimonialManagement: React.FC = () => {
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog 
-        open={!!testimonialToDelete} 
+      <AlertDialog
+        open={!!testimonialToDelete}
         onOpenChange={() => setTestimonialToDelete(null)}
       >
         <AlertDialogContent>
@@ -289,7 +272,7 @@ const TestimonialManagement: React.FC = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTestimonial}>
+            <AlertDialogAction onClick={handleDeleteTestimonial} disabled={isDeleting}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
