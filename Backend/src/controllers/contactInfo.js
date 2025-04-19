@@ -2,7 +2,6 @@ const { executeQuery } = require('../db/db.js');
 
 async function updateContactInfo(req, res) {
   const { company_name, main_email, support_email, main_phone, office_address, facebook_url, instagram_url, linkedin_url, working_days, updated_by } = req.body;
-  console.log(company_name, main_email, support_email, main_phone, office_address, facebook_url, instagram_url, linkedin_url, working_days, updated_by)
   try {
 
     const checkContactInfoQuery = 'SELECT id, company_name, main_email, support_email, main_phone, office_address, facebook_url, instagram_url, linkedin_url, working_days, updated_by FROM contact_info WHERE id = 1';
@@ -96,9 +95,7 @@ async function getContactInfo(req, res) {
       return res.status(404).json({ message: 'Contact info not found' });
     }
 
-    // Parse JSON field
     const contactInfo = result[0];
-    console.log(contactInfo);
    
 
     return res.status(200).json({ contact_info: contactInfo });

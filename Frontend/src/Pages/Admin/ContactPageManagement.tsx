@@ -1,20 +1,17 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Save, 
   Edit, 
   Plus, 
   Trash2, 
   MapPin, 
-  Phone, 
-  Mail, 
-  Clock,
+  Facebook,
+  Instagram,
   Linkedin,
-  Twitter,
-  Facebook
+  X
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
   Dialog, 
@@ -35,10 +32,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Toaster } from "@/components/ui/sonner";
-import { toast } from "sonner"
+import { toast } from "sonner";
+import { useGetContactQueriesQuery, useUpdateContactInfoMutation } from "@/slices/contactApiSlice";
+import { useSelector } from 'react-redux';
+import { selectUser } from '@/slices/authSlice';
 
-interface WorkingHour {
+interface WorkingDay {
   id: string;
   day: string;
   openTime: string;
@@ -46,192 +45,161 @@ interface WorkingHour {
   isOpen: boolean;
 }
 
-interface SocialMediaLink {
-  id: string;
-  platform: string;
-  url: string;
-}
-
-interface ContactUsConfig {
-  companyName: string;
-  mainEmail: string;
-  mainPhone: string;
-  supportEmail: string;
-  address: string;
-  locationPhone: string;
-  locationEmail: string;
-  workingHours: WorkingHour[];
-  socialMedia: SocialMediaLink[];
-  additionalInfo?: string;
-}
-
-const ContactUsManagement: React.FC = () => {
-  const [config, setConfig] = useState<ContactUsConfig>({
-    companyName: 'Acme Corporation',
-    mainEmail: 'contact@acmecorp.com',
-    mainPhone: '+1 (555) 123-4567',
-    supportEmail: 'support@acmecorp.com',
-    address: '123 Business Street, Suite 100, Cityville, State 12345',
-    locationPhone: '+1 (555) 987-6543',
-    locationEmail: 'headquarters@acmecorp.com',
-    workingHours: [
-      { id: '1', day: 'Monday', openTime: '09:00', closeTime: '17:00', isOpen: true },
-      { id: '2', day: 'Tuesday', openTime: '09:00', closeTime: '17:00', isOpen: true },
-      { id: '3', day: 'Wednesday', openTime: '09:00', closeTime: '17:00', isOpen: true },
-      { id: '4', day: 'Thursday', openTime: '09:00', closeTime: '17:00', isOpen: true },
-      { id: '5', day: 'Friday', openTime: '09:00', closeTime: '17:00', isOpen: true },
-      { id: '6', day: 'Saturday', openTime: '10:00', closeTime: '14:00', isOpen: true },
-      { id: '7', day: 'Sunday', openTime: '00:00', closeTime: '00:00', isOpen: false }
-    ],
-    socialMedia: [
-      { id: '1', platform: 'LinkedIn', url: 'https://linkedin.com/company/acmecorp' },
-      { id: '2', platform: 'Twitter', url: 'https://twitter.com/acmecorp' },
-      { id: '3', platform: 'Facebook', url: 'https://facebook.com/acmecorp' }
-    ],
-    additionalInfo: 'We are committed to providing excellent customer service.'
+const ContactUsManagement = () => {
+  const userInfo = useSelector(selectUser);
+  const { data: contactInfoData, isLoading, refetch } = useGetContactQueriesQuery();
+  const [updateContactInfo, { isLoading: isUpdating }] = useUpdateContactInfoMutation();
+  
+  const [isEditMode, setIsEditMode] = useState(false);
+  
+  const [config, setConfig] = useState({
+    company_name: '',
+    main_email: '',
+    main_phone: '',
+    support_email: '',
+    office_address: '',
+    facebook_url: '',
+    instagram_url: '',
+    linkedin_url: '',
+    working_days: [] as WorkingDay[],
+    updated_by: userInfo.id 
   });
 
-  const [isWorkingHourModalOpen, setIsWorkingHourModalOpen] = useState(false);
-  const [isSocialMediaModalOpen, setIsSocialMediaModalOpen] = useState(false);
-  const [deleteConfirmationType, setDeleteConfirmationType] = useState<'workingHour' | 'socialMedia' | null>(null);
+  const [originalConfig, setOriginalConfig] = useState({...config});
+  const [isWorkingDayModalOpen, setIsWorkingDayModalOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState(false);
   const [deleteItemId, setDeleteItemId] = useState<string | null>(null);
 
-  const [tempWorkingHour, setTempWorkingHour] = useState<WorkingHour>({
+  const [tempWorkingDay, setTempWorkingDay] = useState<WorkingDay>({
     id: '', day: '', openTime: '', closeTime: '', isOpen: true
   });
-  const [tempSocialMedia, setTempSocialMedia] = useState<SocialMediaLink>({
-    id: '', platform: '', url: ''
-  });
 
-  const updateConfig = (field: keyof ContactUsConfig, value: string) => {
+  useEffect(() => {
+    if (contactInfoData?.contact_info) {
+      const info = contactInfoData.contact_info;
+      let workingDays = [];
+      
+      try {
+        workingDays = typeof info.working_days === 'string' 
+          ? JSON.parse(info.working_days)
+          : info.working_days || [];
+      } catch (error) {
+        console.error("Error parsing working days:", error);
+        workingDays = [];
+      }
+
+      const newConfig = {
+        company_name: info.company_name || '',
+        main_email: info.main_email || '',
+        main_phone: info.main_phone || '',
+        support_email: info.support_email || '',
+        office_address: info.office_address || '',
+        facebook_url: info.facebook_url || '',
+        instagram_url: info.instagram_url || '',
+        linkedin_url: info.linkedin_url || '',
+        working_days: workingDays,
+        updated_by: userInfo.id
+      };
+
+      setConfig(newConfig);
+      setOriginalConfig({...newConfig});
+    }
+  }, [contactInfoData]);
+
+  const updateConfigField = (field, value) => {
     setConfig(prev => ({
       ...prev,
       [field]: value
     }));
   };
 
-  const handleWorkingHourAction = () => {
-    const isEditing = tempWorkingHour.id !== '';
+  const handleWorkingDayAction = () => {
+    const isEditing = tempWorkingDay.id !== '';
     
     if (isEditing) {
       setConfig(prev => ({
         ...prev,
-        workingHours: prev.workingHours.map(hour => 
-          hour.id === tempWorkingHour.id ? tempWorkingHour : hour
+        working_days: prev.working_days.map(day => 
+          day.id === tempWorkingDay.id ? tempWorkingDay : day
         )
       }));
     } else {
-      const newWorkingHour = {
-        ...tempWorkingHour,
-        id: `${config.workingHours.length + 1}`
+      const newWorkingDay = {
+        ...tempWorkingDay,
+        id: `${Date.now()}`
       };
       setConfig(prev => ({
         ...prev,
-        workingHours: [...prev.workingHours, newWorkingHour]
+        working_days: [...prev.working_days, newWorkingDay]
       }));
     }
 
-    setIsWorkingHourModalOpen(false);
-    setTempWorkingHour({ id: '', day: '', openTime: '', closeTime: '', isOpen: true });
+    setIsWorkingDayModalOpen(false);
+    setTempWorkingDay({ id: '', day: '', openTime: '', closeTime: '', isOpen: true });
   };
 
-  const handleSocialMediaAction = () => {
-    const isEditing = tempSocialMedia.id !== '';
-    
-    if (isEditing) {
+  const handleDeleteWorkingDay = () => {
+    if (deleteItemId) {
       setConfig(prev => ({
         ...prev,
-        socialMedia: prev.socialMedia.map(social => 
-          social.id === tempSocialMedia.id ? tempSocialMedia : social
-        )
+        working_days: prev.working_days.filter(day => day.id !== deleteItemId)
       }));
-    } else {
-      const newSocialMedia = {
-        ...tempSocialMedia,
-        id: `${config.socialMedia.length + 1}`
-      };
-      setConfig(prev => ({
-        ...prev,
-        socialMedia: [...prev.socialMedia, newSocialMedia]
-      }));
-    }
-
-    setIsSocialMediaModalOpen(false);
-    setTempSocialMedia({ id: '', platform: '', url: '' });
-  };
-
-  const handleDeleteItem = () => {
-    if (deleteConfirmationType && deleteItemId) {
-      switch (deleteConfirmationType) {
-        case 'workingHour':
-          setConfig(prev => ({
-            ...prev,
-            workingHours: prev.workingHours.filter(hour => hour.id !== deleteItemId)
-          }));
-          break;
-        case 'socialMedia':
-          setConfig(prev => ({
-            ...prev,
-            socialMedia: prev.socialMedia.filter(social => social.id !== deleteItemId)
-          }));
-          break;
-      }
-      setDeleteConfirmationType(null);
+      setDeleteConfirmation(false);
       setDeleteItemId(null);
     }
   };
 
-  const handleSaveConfiguration = () => {
+  const handleSaveConfiguration = async () => {
     try {
       // Validate configuration
-      if (!config.companyName || !config.mainEmail) {
-        toast({
-          title: "Validation Error",
-          description: "Company Name and Main Email are required.",
-          variant: "destructive"
-        });
+      if (!config.company_name || !config.main_email) {
+        toast.error("Company Name and Main Email are required.");
         return;
       }
 
-      if (!config.address || !config.locationPhone || !config.locationEmail) {
-        toast({
-          title: "Validation Error",
-          description: "Location address, phone, and email are required.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      console.log('Saving configuration:', config);
+      await updateContactInfo(config).unwrap();
       
-      toast({
-        title: "Configuration Saved",
-        description: "Your contact us details have been successfully updated.",
-        variant: "default"
-      });
+      toast.success("Your contact information has been successfully updated.");
+      setIsEditMode(false);
+      setOriginalConfig({...config});
+      
+      refetch();
 
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to save configuration. Please try again.",
-        variant: "destructive"
-      });
+      console.error("Error saving configuration:", error);
+      toast.error("Failed to save configuration. Please try again.");
     }
   };
 
-  const socialMediaIcons = {
-    LinkedIn: <Linkedin className="w-5 h-5" />,
-    Twitter: <Twitter className="w-5 h-5" />,
-    Facebook: <Facebook className="w-5 h-5" />
+  const handleCancelEdit = () => {
+    setConfig({...originalConfig});
+    setIsEditMode(false);
   };
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-64">Loading contact information...</div>;
+  }
 
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold mb-6">Contact Us Management</h1>
-        <Button onClick={handleSaveConfiguration}>
-          <Save className="mr-2 w-4 h-4" /> Save Configuration
-        </Button>
+        <div className="space-x-2">
+          {isEditMode ? (
+            <>
+              <Button variant="outline" onClick={handleCancelEdit} disabled={isUpdating}>
+                <X className="mr-2 w-4 h-4" /> Cancel
+              </Button>
+              <Button onClick={handleSaveConfiguration} disabled={isUpdating}>
+                <Save className="mr-2 w-4 h-4" /> {isUpdating ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </>
+          ) : (
+            <Button onClick={() => setIsEditMode(true)}>
+              <Edit className="mr-2 w-4 h-4" /> Edit Information
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Main Company Information Card */}
@@ -242,40 +210,56 @@ const ContactUsManagement: React.FC = () => {
         <CardContent className="grid md:grid-cols-2 gap-6">
           <div className="space-y-2">
             <Label className="block mb-2">Company Name</Label>
-            <Input 
-              value={config.companyName}
-              onChange={(e) => updateConfig('companyName', e.target.value)}
-              placeholder="Enter company name"
-            />
+            {isEditMode ? (
+              <Input 
+                value={config.company_name}
+                onChange={(e) => updateConfigField('company_name', e.target.value)}
+                placeholder="Enter company name"
+              />
+            ) : (
+              <p className="p-2 border rounded-md bg-gray-50">{config.company_name || 'Not set'}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label className="block mb-2">Main Email</Label>
-            <Input 
-              value={config.mainEmail}
-              onChange={(e) => updateConfig('mainEmail', e.target.value)}
-              placeholder="Enter main contact email"
-            />
+            {isEditMode ? (
+              <Input 
+                value={config.main_email}
+                onChange={(e) => updateConfigField('main_email', e.target.value)}
+                placeholder="Enter main contact email"
+              />
+            ) : (
+              <p className="p-2 border rounded-md bg-gray-50">{config.main_email || 'Not set'}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label className="block mb-2">Main Phone</Label>
-            <Input 
-              value={config.mainPhone}
-              onChange={(e) => updateConfig('mainPhone', e.target.value)}
-              placeholder="Enter main phone number"
-            />
+            {isEditMode ? (
+              <Input 
+                value={config.main_phone}
+                onChange={(e) => updateConfigField('main_phone', e.target.value)}
+                placeholder="Enter main phone number"
+              />
+            ) : (
+              <p className="p-2 border rounded-md bg-gray-50">{config.main_phone || 'Not set'}</p>
+            )}
           </div>
           <div className="space-y-2">
             <Label className="block mb-2">Support Email</Label>
-            <Input 
-              value={config.supportEmail}
-              onChange={(e) => updateConfig('supportEmail', e.target.value)}
-              placeholder="Enter support email"
-            />
+            {isEditMode ? (
+              <Input 
+                value={config.support_email}
+                onChange={(e) => updateConfigField('support_email', e.target.value)}
+                placeholder="Enter support email"
+              />
+            ) : (
+              <p className="p-2 border rounded-md bg-gray-50">{config.support_email || 'Not set'}</p>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Single Location Card */}
+      {/* Office Location Card */}
       <Card>
         <CardHeader>
           <CardTitle>Office Location</CardTitle>
@@ -285,31 +269,15 @@ const ContactUsManagement: React.FC = () => {
             <Label className="flex items-center">
               <MapPin className="mr-2 w-4 h-4" /> Address
             </Label>
-            <Input 
-              value={config.address}
-              onChange={(e) => updateConfig('address', e.target.value)}
-              placeholder="Enter full address"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label className="flex items-center">
-              <Phone className="mr-2 w-4 h-4" /> Location Phone
-            </Label>
-            <Input 
-              value={config.locationPhone}
-              onChange={(e) => updateConfig('locationPhone', e.target.value)}
-              placeholder="Enter location phone number"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label className="flex items-center">
-              <Mail className="mr-2 w-4 h-4" /> Location Email
-            </Label>
-            <Input 
-              value={config.locationEmail}
-              onChange={(e) => updateConfig('locationEmail', e.target.value)}
-              placeholder="Enter location email address"
-            />
+            {isEditMode ? (
+              <Input 
+                value={config.office_address}
+                onChange={(e) => updateConfigField('office_address', e.target.value)}
+                placeholder="Enter full address"
+              />
+            ) : (
+              <p className="p-2 border rounded-md bg-gray-50">{config.office_address || 'Not set'}</p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -318,159 +286,150 @@ const ContactUsManagement: React.FC = () => {
       <Card>
         <CardHeader className="flex-row justify-between items-center">
           <CardTitle>Working Hours</CardTitle>
-          <Button 
-            onClick={() => {
-              setTempWorkingHour({ id: '', day: '', openTime: '', closeTime: '', isOpen: true });
-              setIsWorkingHourModalOpen(true);
-            }}
-          >
-            <Plus className="mr-2 w-4 h-4" /> Add Working Hours
-          </Button>
+          {isEditMode && (
+            <Button 
+              onClick={() => {
+                setTempWorkingDay({ id: '', day: '', openTime: '', closeTime: '', isOpen: true });
+                setIsWorkingDayModalOpen(true);
+              }}
+            >
+              <Plus className="mr-2 w-4 h-4" /> Add Working Hours
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
-          {config.workingHours.map((hour) => (
-            <div key={hour.id} className="border-b py-4 flex justify-between items-center">
-              <div>
-                <p className="font-semibold">{hour.day}</p>
-                <p className="text-muted-foreground">
-                  {hour.isOpen 
-                    ? `${hour.openTime} - ${hour.closeTime}` 
-                    : 'Closed'}
-                </p>
+          {config.working_days.length === 0 ? (
+            <p className="text-muted-foreground py-4">No working hours defined.</p>
+          ) : (
+            config.working_days.map((day) => (
+              <div key={day.id} className="border-b py-4 flex justify-between items-center">
+                <div>
+                  <p className="font-semibold">{day.day}</p>
+                  <p className="text-muted-foreground">
+                    {day.isOpen 
+                      ? `${day.openTime} - ${day.closeTime}` 
+                      : 'Closed'}
+                  </p>
+                </div>
+                {isEditMode && (
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setTempWorkingDay(day);
+                        setIsWorkingDayModalOpen(true);
+                      }}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      variant="destructive" 
+                      size="sm"
+                      onClick={() => {
+                        setDeleteItemId(day.id);
+                        setDeleteConfirmation(true);
+                      }}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
-              <div className="flex space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    setTempWorkingHour(hour);
-                    setIsWorkingHourModalOpen(true);
-                  }}
-                >
-                  <Edit className="w-4 h-4" />
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => {
-                    setDeleteConfirmationType('workingHour');
-                    setDeleteItemId(hour.id);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </CardContent>
       </Card>
 
       {/* Social Media Management */}
       <Card>
-        <CardHeader className="flex-row justify-between items-center">
-          <CardTitle>Social Media Links</CardTitle>
-          <Button 
-            onClick={() => {
-              setTempSocialMedia({ id: '', platform: '', url: '' });
-              setIsSocialMediaModalOpen(true);
-            }}
-          >
-            <Plus className="mr-2 w-4 h-4" /> Add Social Media
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {config.socialMedia.map((social) => (
-            <div key={social.id} className="border-b py-4 flex justify-between items-center">
-              <div className="flex items-center space-x-3">
-                {socialMediaIcons[social.platform as keyof typeof socialMediaIcons]}
-                <div>
-                  <p className="font-semibold">{social.platform}</p>
-                  <p className="text-muted-foreground">{social.url}</p>
-                </div>
-              </div>
-              <div className="flex space-x-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => {
-                    setTempSocialMedia(social);
-                    setIsSocialMediaModalOpen(true);
-                  }}
-                >
-                  <Edit className="w-4 h-4" />
-                </Button>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={() => {
-                    setDeleteConfirmationType('socialMedia');
-                    setDeleteItemId(social.id);
-                  }}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      {/* Additional Information Card */}
-      <Card>
         <CardHeader>
-          <CardTitle>Additional Information</CardTitle>
+          <CardTitle>Social Media Links</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="grid md:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <Label className="block mb-2">Additional Information</Label>
-            <Textarea 
-              value={config.additionalInfo}
-              onChange={(e) => updateConfig('additionalInfo', e.target.value)}
-              placeholder="Optional additional contact information or message"
-              className="min-h-[120px]"
-            />
+            <Label className="flex items-center">
+              <Facebook className="mr-2 w-4 h-4" /> Facebook URL
+            </Label>
+            {isEditMode ? (
+              <Input 
+                value={config.facebook_url}
+                onChange={(e) => updateConfigField('facebook_url', e.target.value)}
+                placeholder="Enter Facebook page URL"
+              />
+            ) : (
+              <p className="p-2 border rounded-md bg-gray-50">{config.facebook_url || 'Not set'}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label className="flex items-center">
+              <Instagram className="mr-2 w-4 h-4" /> Instagram URL
+            </Label>
+            {isEditMode ? (
+              <Input 
+                value={config.instagram_url}
+                onChange={(e) => updateConfigField('instagram_url', e.target.value)}
+                placeholder="Enter Instagram profile URL"
+              />
+            ) : (
+              <p className="p-2 border rounded-md bg-gray-50">{config.instagram_url || 'Not set'}</p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label className="flex items-center">
+              <Linkedin className="mr-2 w-4 h-4" /> LinkedIn URL
+            </Label>
+            {isEditMode ? (
+              <Input 
+                value={config.linkedin_url}
+                onChange={(e) => updateConfigField('linkedin_url', e.target.value)}
+                placeholder="Enter LinkedIn page URL"
+              />
+            ) : (
+              <p className="p-2 border rounded-md bg-gray-50">{config.linkedin_url || 'Not set'}</p>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Working Hours Modal */}
-      <Dialog open={isWorkingHourModalOpen} onOpenChange={setIsWorkingHourModalOpen}>
+      {/* Working Day Modal */}
+      <Dialog open={isWorkingDayModalOpen} onOpenChange={setIsWorkingDayModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{tempWorkingHour.id ? 'Edit Working Hours' : 'Add Working Hours'}</DialogTitle>
+            <DialogTitle>{tempWorkingDay.id ? 'Edit Working Hours' : 'Add Working Hours'}</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label>Day</Label>
               <Input 
-                value={tempWorkingHour.day}
-                onChange={(e) => setTempWorkingHour(prev => ({...prev, day: e.target.value}))}
+                value={tempWorkingDay.day}
+                onChange={(e) => setTempWorkingDay(prev => ({...prev, day: e.target.value}))}
                 placeholder="Enter day (e.g., Monday)"
               />
             </div>
             <div className="flex items-center space-x-2">
               <Label>Open</Label>
               <Switch 
-                checked={tempWorkingHour.isOpen}
-                onCheckedChange={(checked) => setTempWorkingHour(prev => ({...prev, isOpen: checked}))}
+                checked={tempWorkingDay.isOpen}
+                onCheckedChange={(checked) => setTempWorkingDay(prev => ({...prev, isOpen: checked}))}
               />
             </div>
-            {tempWorkingHour.isOpen && (
+            {tempWorkingDay.isOpen && (
               <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Open Time</Label>
                   <Input 
                     type="time"
-                    value={tempWorkingHour.openTime}
-                    onChange={(e) => setTempWorkingHour(prev => ({...prev, openTime: e.target.value}))}
+                    value={tempWorkingDay.openTime}
+                    onChange={(e) => setTempWorkingDay(prev => ({...prev, openTime: e.target.value}))}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label>Close Time</Label>
                   <Input 
                     type="time"
-                    value={tempWorkingHour.closeTime}
-                    onChange={(e) => setTempWorkingHour(prev => ({...prev, closeTime: e.target.value}))}
+                    value={tempWorkingDay.closeTime}
+                    onChange={(e) => setTempWorkingDay(prev => ({...prev, closeTime: e.target.value}))}
                   />
                 </div>
               </div>
@@ -478,50 +437,10 @@ const ContactUsManagement: React.FC = () => {
           </div>
           <DialogFooter>
             <Button 
-              onClick={handleWorkingHourAction}
-              disabled={!tempWorkingHour.day || (tempWorkingHour.isOpen && (!tempWorkingHour.openTime || !tempWorkingHour.closeTime))}
+              onClick={handleWorkingDayAction}
+              disabled={!tempWorkingDay.day || (tempWorkingDay.isOpen && (!tempWorkingDay.openTime || !tempWorkingDay.closeTime))}
             >
-              <Save className="mr-2 w-4 h-4" /> Save Working Hours
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Social Media Modal */}
-      <Dialog open={isSocialMediaModalOpen} onOpenChange={setIsSocialMediaModalOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{tempSocialMedia.id ? 'Edit Social Media' : 'Add Social Media'}</DialogTitle>
-          </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-2">
-              <Label>Platform</Label>
-              <select 
-                value={tempSocialMedia.platform}
-                onChange={(e) => setTempSocialMedia(prev => ({...prev, platform: e.target.value}))}
-                className="w-full p-2 border rounded"
-              >
-                <option value="">Select Platform</option>
-                <option value="LinkedIn">LinkedIn</option>
-                <option value="Twitter">Twitter</option>
-                <option value="Facebook">Facebook</option>
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label>URL</Label>
-              <Input 
-                value={tempSocialMedia.url}
-                onChange={(e) => setTempSocialMedia(prev => ({...prev, url: e.target.value}))}
-                placeholder="Enter full social media profile URL"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button 
-              onClick={handleSocialMediaAction}
-              disabled={!tempSocialMedia.platform || !tempSocialMedia.url}
-            >
-              <Save className="mr-2 w-4 h-4" /> Save Social Media
+              <Save className="mr-2 w-4 h-4" /> Save
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -529,27 +448,24 @@ const ContactUsManagement: React.FC = () => {
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog 
-        open={deleteConfirmationType !== null} 
-        onOpenChange={() => setDeleteConfirmationType(null)}
+        open={deleteConfirmation} 
+        onOpenChange={setDeleteConfirmation}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Confirmation</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this item? This action cannot be undone.
+              Are you sure you want to delete this working day? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteItem}>
+            <AlertDialogAction onClick={handleDeleteWorkingDay}>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Toast component for notifications */}
-      <Toaster />
     </div>
   );
 };
