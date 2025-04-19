@@ -11,6 +11,7 @@ const {router:testimonialRouter}=require('./routes/testimonialRouter.js');
 const {router:contactRouter}=require('./routes/contactRouter.js');
 const {router:subscriberRouter}=require('./routes/subscriberRouter.js');
 const {router:vehicleModelRouter}=require('./routes/vehicleModel.js');
+const {router:contactInfoRouter}=require('./routes/contactInfoRouter.js');
 app.use(cors({
     origin:process.env.CORS_ORIGIN,
     credentials:true
@@ -29,6 +30,7 @@ app.use("/api/booking",bookingRouter)
 app.use("/api/testimonial",testimonialRouter)
 app.use("/api/contact",contactRouter)
 app.use("/api/subscribe",subscriberRouter)
+app.use("/api/contact-info",contactInfoRouter)
 
 app.listen(process.env.PORT || 8000,
     ()=>{
