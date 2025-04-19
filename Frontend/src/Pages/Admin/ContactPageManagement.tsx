@@ -33,7 +33,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { useGetContactQueriesQuery, useUpdateContactInfoMutation } from "@/slices/contactApiSlice";
+import { useGetContactInfoQuery, useUpdateContactInfoMutation } from "@/slices/contactApiSlice";
 import { useSelector } from 'react-redux';
 import { selectUser } from '@/slices/authSlice';
 
@@ -47,7 +47,7 @@ interface WorkingDay {
 
 const ContactUsManagement = () => {
   const userInfo = useSelector(selectUser);
-  const { data: contactInfoData, isLoading, refetch } = useGetContactQueriesQuery();
+  const { data: contactInfoData, isLoading, refetch } = useGetContactInfoQuery();
   const [updateContactInfo, { isLoading: isUpdating }] = useUpdateContactInfoMutation();
   
   const [isEditMode, setIsEditMode] = useState(false);
