@@ -84,6 +84,7 @@ async function login(req, res) {
                                               name: user.name, 
                                               email: user.email, 
                                               phoneNumber: user.phone_number, 
+                                              role: user.role,
                                             } 
                                 });
   } catch (error) {

@@ -4,7 +4,7 @@ const contactApiSlice = apiSlice.injectEndpoints({
     endpoints: (builder)=>({
         getContactInfo : builder.query({
             query: ()=>({
-                url: "/contact/active-contacts",
+                url: "/contact-info/",
                 method:"GET",
             })
         }),
@@ -29,8 +29,8 @@ const contactApiSlice = apiSlice.injectEndpoints({
             })
         }),
         updateContactInfo : builder.mutation({
-            query: ({id, payload})=>({
-                url: `/contact/update-status/${id}`,
+            query: (payload)=>({
+                url: `/contact-info/update`,
                 method:"PUT",
                 body: payload,
             })

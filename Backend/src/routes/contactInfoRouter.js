@@ -5,7 +5,7 @@ const { verifyJWT } = require('../middlewares/auth.js');
 const { isAdmin } = require('../middlewares/isAdmin.js');
 
 
+router.get('/',getContactInfo);
 router.put('/update', verifyJWT, isAdmin, updateContactInfo);  
- router.get('/',getContactInfo);
 
 module.exports ={router};
