@@ -1,206 +1,332 @@
 const { executeQuery } = require('../db/db.js');
-const { uploadOnCloudinary } = require('../middlewares/cloudinary.js');
+const { uploadOnCloudinary, deleteFromCloudinary } = require('../middlewares/cloudinary.js'); 
 
 async function bookCar(req, res) {
-    try {
-        const {
-            vehicle_id,
-            booking_date,
-            return_date,
-            permanent_address,
-            temporary_address,
-            license_number
-        } = req.body;
+  const user_id = req.user.id;
+  const {
+    model_id,
+    booking_date,
+    return_date,
+    current_address,
+    house_number,
+    street,
+    area,
+    city,
+    state,
+    country,
+    zip_code,
+    license_number
+  } = req.body;
 
-        const user_id = req.user.id;
+  if (!user_id || !model_id || !booking_date || !return_date || !current_address) {
+    return res.status(400).json({ error: 'Missing required booking fields.' });
+  }
 
-        const vehicle = await executeQuery(
-            `SELECT * FROM vehicles WHERE id=? AND status='available'`,
-            [vehicle_id]
-        );
-        if (vehicle.length === 0) {
-            return res.status(400).json({ message: 'Vehicle not available for booking' });
-        }
+  try {
+    const userRows = await executeQuery(
+      'SELECT license_number, licence_image, aadhaar_image FROM users WHERE id = ?',
+      [user_id]
+    );
 
-        const prevBookings = await executeQuery(
-            `SELECT COUNT(*) as count FROM bookings WHERE user_id=?`,
-            [user_id]
-        );
-        const isFirstBooking = prevBookings[0].count === 0;
-
-        const user = await executeQuery(`SELECT * FROM users WHERE id=?`, [user_id]);
-        const currentUser = user[0];
-
-        const existingPerm = await executeQuery(
-            `SELECT id FROM addresses WHERE user_id=? AND address_type='permanent'`,
-            [user_id]
-        );
-
-        if (isFirstBooking) {
-            const licenseImg = req.files?.license_image?.[0];
-            const aadhaarImg = req.files?.aadhaar_image?.[0];
-
-            if (
-                !currentUser.license_number || !currentUser.license_image || !currentUser.aadhaar_image ||
-                existingPerm.length === 0
-            ) {
-                if (!license_number || !licenseImg || !aadhaarImg) {
-                    return res.status(400).json({ message: 'License number, license image, and Aadhaar image are required.' });
-                }
-
-                if (!permanent_address) {
-                    return res.status(400).json({ message: 'Permanent address is required.' });
-                }
-
-                const { house_no, street, area, city, state, zip_code, country } = permanent_address;
-                if (!house_no || !street || !area || !city || !state || !zip_code) {
-                    return res.status(400).json({ message: 'All fields in permanent address are required.' });
-                }
-
-                const licenseImageUrl = await uploadOnCloudinary(licenseImg.path);
-                const aadhaarImageUrl = await uploadOnCloudinary(aadhaarImg.path);
-
-
-                await executeQuery(
-                    `UPDATE users SET license_number=?, license_image=?, aadhaar_image=? WHERE id=?`,
-                    [license_number, licenseImageUrl, aadhaarImageUrl, user_id]
-                );
-
-                await executeQuery(
-                    `INSERT INTO addresses (user_id, address_type, house_no, street, area, city, state, zip_code, country)
-                     VALUES (?, 'permanent', ?, ?, ?, ?, ?, ?, ?)`,
-                    [user_id, house_no, street, area, city, state, zip_code, country || 'India']
-                );
-            }
-        }
-
-        const totalDays = Math.ceil((new Date(return_date) - new Date(booking_date)) / (1000 * 60 * 60 * 24));
-        const totalAmount = totalDays * vehicle[0].price_per_day;
-
-        const bookingResult = await executeQuery(
-            `INSERT INTO bookings (user_id, vehicle_id, booking_date, return_date, booking_status, total_amount)
-             VALUES (?, ?, ?, ?, 'pending', ?)`,
-            [user_id, vehicle_id, booking_date, return_date, totalAmount]
-        );
-        const booking_id = bookingResult.insertId;
-
-        if (temporary_address) {
-            const { house_no, street, area, city, state, zip_code, country } = temporary_address;
-            await executeQuery(
-                `INSERT INTO addresses (user_id, booking_id, address_type, house_no, street, area, city, state, zip_code, country)
-                 VALUES (?, ?, 'temporary', ?, ?, ?, ?, ?, ?, ?)`,
-                [user_id, booking_id, house_no, street, area, city, state, zip_code, country || 'India']
-            );
-        }
-
-        await executeQuery(`UPDATE vehicles SET status='booked' WHERE id=?`, [vehicle_id]);
-
-        res.status(201).json({ message: 'Booking request submitted successfully' });
-    } catch (error) {
-        console.error('Error in bookCar:', error.message);
-        res.status(500).json({ error: error.message });
+    if (!userRows.length) {
+      return res.status(400).json({ error: 'User not found.' });
     }
+
+    const { license_number: existingLicenseNumber, licence_image, aadhaar_image } = userRows[0];
+    let newLicenseNumber = existingLicenseNumber;
+    let newLicenseImage = licence_image;
+    let newAadharImage = aadhaar_image;
+
+    if (!existingLicenseNumber || !licence_image || !aadhaar_image) {
+      const aadhaarImage = req.files?.aadhaar_image?.[0];
+      const licenseImage = req.files?.license_image?.[0];
+
+      if (!aadhaarImage || !licenseImage || !license_number) {
+        return res.status(400).json({
+          error: 'License number, Aadhaar image, and License image are required to be provided.'
+        });
+      }
+
+      if (aadhaarImage) {
+        if (aadhaar_image) await deleteFromCloudinary(aadhaar_image);
+        newAadharImage = (await uploadOnCloudinary(aadhaarImage.path))?.url;
+      }
+
+      if (licenseImage) {
+        if (licence_image) await deleteFromCloudinary(licence_image);
+        newLicenseImage = (await uploadOnCloudinary(licenseImage.path))?.url;
+      }
+
+      newLicenseNumber = license_number;
+    }
+
+    await executeQuery(
+      'UPDATE users SET license_number = ?, licence_image = ?, aadhaar_image = ? WHERE id = ?',
+      [newLicenseNumber, newLicenseImage, newAadharImage, user_id]
+    );
+
+    const addressRows = await executeQuery(
+      'SELECT * FROM addresses WHERE user_id = ?',
+      [user_id]
+    );
+
+    if (!addressRows.length) {
+      if (!house_number || !street || !area || !city || !state || !country || !zip_code) {
+        return res.status(400).json({ error: 'Missing required address fields.' });
+      }
+
+      await executeQuery(
+        'INSERT INTO addresses (user_id, house_number, street, area, city, state, country, zip_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [user_id, house_number, street, area, city, state, country, zip_code]
+      );
+      }
+    const resultSets = await executeQuery(
+      'CALL CreateBookingWithModel(?, ?, ?, ?, ?)',
+      [user_id, model_id, booking_date, return_date, current_address]
+    );
+
+    const result = resultSets[0];
+
+    res.status(201).json({
+      message: 'Booking created successfully.',
+      booking: result
+    });
+  } catch (err) {
+    console.error('Booking Error:', err.message);
+    res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
+  }
 }
 
 
 async function viewBookingHistory(req, res) {
+    const user_id = req.user.id;
+  
     try {
-        const user_id = req.user.id;
-        const bookings = await executeQuery(`
-            SELECT b.*, v.model AS vehicle_model,
-                (SELECT JSON_OBJECT('house_no', a.house_no, 'street', a.street, 'area', a.area, 'city', a.city, 'state', a.state, 'zip_code', a.zip_code, 'country', a.country)
-                 FROM addresses a
-                 WHERE a.booking_id = b.id AND a.address_type = 'temporary'
-                 LIMIT 1) AS temporary_address
-            FROM bookings b
-            JOIN vehicles v ON b.vehicle_id = v.id
-            WHERE b.user_id = ?
-            ORDER BY b.created_at DESC
-        `, [user_id]);
-        res.status(200).json(bookings);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+      const bookings = await executeQuery(
+        `SELECT b.id AS booking_id,
+       b.vehicle_id,b.rating,b.review,
+       v.id AS vehicle_exists,
+       b.vehicle_model_id,
+       vm.id AS model_exists,
+       vm.brand_id,
+       vb.id AS brand_exists
+FROM bookings b
+LEFT JOIN vehicles v ON b.vehicle_id = v.id
+LEFT JOIN vehicle_models vm ON b.vehicle_model_id = vm.id
+LEFT JOIN vehicle_brands vb ON vm.brand_id = vb.id
+WHERE b.user_id = ?;
+`,
+        [user_id]
+      );
+       console.log(bookings);
+      if (bookings.length === 0) {
+        return res.status(404).json({ message: 'No booking history found.' });
+      }
+  
+      res.status(200).json({ bookings });
+    } catch (err) {
+      console.error('Error fetching booking history:', err.message);
+      res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
     }
-}
+  }
+  
 
-async function cancelBooking(req, res) {
+  async function cancelBooking(req, res) {
+    const user_id = req.user.id;
+    const booking_id = req.params.id; 
+    if (!booking_id) {
+      return res.status(400).json({ error: 'Booking ID is required.' });
+    }
+  
     try {
-        const booking_id = req.params.id;
-        const user_id = req.user.id;
-
-        const booking = await executeQuery(`SELECT * FROM bookings WHERE id=? AND user_id=?`, [booking_id, user_id]);
-        if (booking.length === 0) {
-            return res.status(404).json({ message: 'Booking not found' });
-        }
-
-        await executeQuery(`UPDATE bookings SET booking_status='cancelled' WHERE id=?`, [booking_id]);
-        await executeQuery(`UPDATE vehicles SET status='available' WHERE id=?`, [booking[0].vehicle_id]);
-
-        res.status(200).json({ message: 'Booking cancelled successfully' });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+      const bookingRows = await executeQuery(
+        'SELECT id, user_id, vehicle_id, booking_status FROM bookings WHERE id = ? AND user_id = ?',
+        [booking_id, user_id]
+      );
+  
+      if (bookingRows.length === 0) {
+        return res.status(404).json({ error: 'Booking not found.' });
+      }
+  
+      const booking = bookingRows[0];
+      if (booking.booking_status === 'cancelled') {
+        return res.status(400).json({ error: 'Booking has already been cancelled.' });
+      }
+      await executeQuery(
+        'UPDATE bookings SET booking_status = "cancelled" WHERE id = ?',
+        [booking_id]
+      );
+      await executeQuery(
+        'UPDATE vehicles SET availability_status = "available" WHERE id = ?',
+        [booking.vehicle_id]
+      );
+  
+      res.status(200).json({ message: 'Booking cancelled successfully, and vehicle status updated to available.' });
+  
+    } catch (err) {
+      console.error('Cancel Booking Error:', err.message);
+      res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
     }
-}
+  }
 
-async function viewAllBookings(req, res) {
+
+  async function viewAllBookings(req, res) {
     try {
-        const bookings = await executeQuery(`
-            SELECT b.*, u.name AS user_name, v.model AS vehicle_model,
-                (SELECT JSON_OBJECT('house_no', a.house_no, 'street', a.street, 'area', a.area, 'city', a.city, 'state', a.state, 'zip_code', a.zip_code, 'country', a.country)
-                 FROM addresses a
-                 WHERE a.booking_id = b.id AND a.address_type = 'temporary'
-                 LIMIT 1) AS temporary_address
-            FROM bookings b
-            JOIN users u ON b.user_id = u.id
-            JOIN vehicles v ON b.vehicle_id = v.id
-            ORDER BY b.created_at DESC
-        `);
-        res.status(200).json(bookings);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+      const bookings = await executeQuery(
+        'SELECT * FROM bookings ORDER BY booking_date DESC'
+      );
+  
+      if (!bookings.length) {
+        return res.status(404).json({ message: 'No bookings found.' });
+      }
+  
+      res.status(200).json({
+        message: 'All bookings retrieved successfully.',
+        bookings
+      });
+    } catch (err) {
+      console.error('Error retrieving all bookings:', err.message);
+      res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
     }
-}
+  }
 
-async function confirmBooking(req, res) {
+ 
+  async function updateBookingStatus(req, res) {
+    const booking_id = req.params.id;
+    const { status } = req.body;
+  
+    if (!status) {
+      return res.status(400).json({ error: 'Booking status is required.' });
+    }
+  
     try {
-        const booking_id = req.params.id;
-
-        const booking = await executeQuery(`SELECT * FROM bookings WHERE id=?`, [booking_id]);
-        if (booking.length === 0) {
-            return res.status(404).json({ message: 'Booking not found' });
-        }
-
-        await executeQuery(`UPDATE bookings SET booking_status='confirmed' WHERE id=?`, [booking_id]);
-
-        res.status(200).json({ message: 'Booking confirmed successfully' });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+      const booking = await executeQuery(
+        'SELECT * FROM bookings WHERE id = ?',
+        [booking_id]
+      );
+  
+      if (!booking.length) {
+        return res.status(404).json({ error: 'Booking not found.' });
+      }
+  
+      await executeQuery(
+        'UPDATE bookings SET booking_status = ? WHERE id = ?',
+        [status, booking_id]
+      );
+  
+      if (status === 'Cancelled') {
+        await executeQuery(
+          'UPDATE vehicles SET status = "Available" WHERE id = ?',
+          [booking[0].vehicle_id]
+        );
+      }
+  
+      res.status(200).json({
+        message: `Booking status updated to ${status}.`,
+        booking_id
+      });
+    } catch (err) {
+      console.error('Error updating booking status:', err.message);
+      res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
     }
-}
-
-async function adminCancelBooking(req, res) {
+  }
+  async function updatePaymentStatus(req, res) {
+    const booking_id = req.params.id;
+    const { payment_status } = req.body;
+  
+    if (!payment_status) {
+      return res.status(400).json({ error: 'Payment status is required.' });
+    }
+  
     try {
-        const booking_id = req.params.id;
-
-        const booking = await executeQuery(`SELECT * FROM bookings WHERE id=?`, [booking_id]);
-        if (booking.length === 0) {
-            return res.status(404).json({ message: 'Booking not found' });
-        }
-
-        await executeQuery(`UPDATE bookings SET booking_status='cancelled' WHERE id=?`, [booking_id]);
-        await executeQuery(`UPDATE vehicles SET status='available' WHERE id=?`, [booking[0].vehicle_id]);
-
-        res.status(200).json({ message: 'Booking cancelled successfully' });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
+      const booking = await executeQuery(
+        'SELECT * FROM bookings WHERE id = ?',
+        [booking_id]
+      );
+  
+      if (!booking.length) {
+        return res.status(404).json({ error: 'Booking not found.' });
+      }
+  
+      await executeQuery(
+        'UPDATE bookings SET payment_status = ? WHERE id = ?',
+        [payment_status, booking_id]
+      );
+  
+      res.status(200).json({
+        message: `Payment status updated to ${payment_status}.`,
+        booking_id
+      });
+    } catch (err) {
+      console.error('Error updating payment status:', err.message);
+      res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
     }
-}
+  }
+  
+  async function getBookingInfoById(req, res) {
+    const booking_id = req.params.id;
+  
+    try {
+      const bookings = await executeQuery(
+        `SELECT b.id, b.booking_date,b.rating,b.review, b.return_date, b.booking_status, b.payment_status, b.total_amount, b.current_address,
+                v.registration_no, v.plate_number, v.color,
+                vm.model_name AS vehicle_model,
+                vb.brand_name AS vehicle_brand,
+                u.name AS user_name, u.email, u.phone_number
+         FROM bookings b
+         JOIN vehicles v ON b.vehicle_id = v.id
+         JOIN vehicle_models vm ON b.vehicle_model_id = vm.id
+         JOIN vehicle_brands vb ON vm.brand_id = vb.id
+         JOIN users u ON b.user_id = u.id
+         WHERE b.id = ?`,
+        [booking_id]
+      );
+  
+      if (!bookings.length) {
+        return res.status(404).json({ error: 'Booking not found.' });
+      }
+  
+      res.status(200).json({ booking: bookings[0] });
+    } catch (err) {
+      console.error('Error fetching booking info:', err.message);
+      res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
+    }
+  }
 
-module.exports = {
-    bookCar,
-    viewBookingHistory,
-    cancelBooking,
-    viewAllBookings,
-    confirmBooking,
-    adminCancelBooking,
-};
+  async function rateBooking(req, res) {
+    const user_id = req.user.id;
+    const booking_id = req.params.id;
+    const { rating, review } = req.body;
+  
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: 'Rating must be between 1 and 5.' });
+    }
+  
+    try {
+      const bookingRows = await executeQuery(
+        'SELECT * FROM bookings WHERE id = ? AND user_id = ?',
+        [booking_id, user_id]
+      );
+  
+      if (!bookingRows.length) {
+        return res.status(404).json({ error: 'Booking not found.' });
+      }
+  
+      if (bookingRows[0].rating) {
+        return res.status(400).json({ error: 'Booking already rated.' });
+      }
+  
+      await executeQuery(
+        'UPDATE bookings SET rating = ?, review = ? WHERE id = ?',
+        [rating, review || '', booking_id]
+      );
+  
+      res.status(200).json({ message: 'Thank you for your feedback!' });
+    } catch (err) {
+      console.error('Rating Error:', err.message);
+      res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
+    }
+  }
+  
+  
+module.exports = { bookCar,viewBookingHistory,cancelBooking,viewAllBookings,updateBookingStatus,updatePaymentStatus,getBookingInfoById,rateBooking};

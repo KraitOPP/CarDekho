@@ -18,7 +18,18 @@ async function addVehicle(req, res) {
             insurance_detail 
         } = req.body;
         const images = req.files;
-
+        console.log( model_id,
+            registration_no,
+            plate_number,
+            color,
+            availability_status,
+            current_mileage,
+            purchase_date,
+            insurance_provider,
+            insurance_policy_number,
+            insurance_expiry_date,
+            insurance_detail,images )
+           const  availabilitystatus = availability_status || 'available'; // Default to 'available' if not provided
        
         const vehicleQuery = `
             INSERT INTO vehicles 
@@ -30,7 +41,7 @@ async function addVehicle(req, res) {
             registration_no,
             plate_number,
             color,
-            availability_status,
+            availabilitystatus,
             current_mileage,
             purchase_date,
             insurance_provider,

@@ -1,27 +1,34 @@
 const express = require('express');
 const router = express.Router();
-const {bookCar,viewBookingHistory,cancelBooking,viewAllBookings,confirmBooking,adminCancelBooking,}=require('../controllers/booking.js')
-const {verifyJWT}= require('../middlewares/auth.js');
-const {isAdmin}=require('../middlewares/isAdmin.js')
+
+const {
+  bookCar,
+  viewBookingHistory,
+  cancelBooking,
+  viewAllBookings,
+  updateBookingStatus,
+  updatePaymentStatus,
+  getBookingInfoById,
+  rateBooking
+} = require('../controllers/booking.js');
+
+const { verifyJWT } = require('../middlewares/auth');
+const { isAdmin } = require('../middlewares/isAdmin');
 const {upload}=require('../middlewares/cloudinary.js')
 
-
-router.post(
-    '/book',
-    verifyJWT,
-    upload.fields([
-      { name: 'license_image', maxCount: 1 },
-      { name: 'aadhaar_image', maxCount: 1 }
-    ]),
-    bookCar
-  );
-  
-router.get('/book-history', verifyJWT,viewBookingHistory); 
+// User Routes
+router.post('/book', verifyJWT,upload.fields([
+  { name: 'aadhaar_image', maxCount: 1 },
+  { name: 'license_image', maxCount: 1 }
+]), bookCar);
+router.get('/history', verifyJWT, viewBookingHistory);
 router.put('/cancel/:id', verifyJWT, cancelBooking);
 
-// **ADMIN ROUTES**
-router.get('/view-bookings', verifyJWT,isAdmin,viewAllBookings); 
-router.put('/confirm-booking/:id', verifyJWT,isAdmin,confirmBooking); 
-router.put('/admin-cancel-booking/:id', verifyJWT, isAdmin,adminCancelBooking); 
+// Admin Routes
+router.get('/all', verifyJWT, isAdmin, viewAllBookings);
+router.put('/status/:id', verifyJWT, isAdmin, updateBookingStatus);
+router.put('/payment/:id', verifyJWT, isAdmin, updatePaymentStatus);
+router.get('/info/:id', verifyJWT, isAdmin, getBookingInfoById);
+router.post('/rate/:id', verifyJWT, rateBooking);
 
 module.exports = {router};

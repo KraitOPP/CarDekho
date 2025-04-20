@@ -74,10 +74,20 @@ async function getVehicleModel(req, res) {
         }
 
         const images = await executeQuery(`SELECT image_path FROM vehicle_model_images WHERE model_id=?`, [id]);
+        const ratingResult = await executeQuery(
+            `SELECT ROUND(AVG(rating), 1) AS avg_rating, COUNT(*) AS total_reviews
+             FROM bookings 
+             WHERE vehicle_model_id = ? AND rating IS NOT NULL`,
+            [id]
+        );
 
+        const avg_rating = ratingResult[0].avg_rating || null;
+        const total_reviews = ratingResult[0].total_reviews || 0;
         res.status(200).json({
             model: model[0],
             images: images.map(img => img.image_path),
+            avg_rating,
+            total_reviews
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -90,16 +100,38 @@ async function getAllVehicleModels(req, res) {
         const models = await executeQuery(`SELECT * FROM vehicle_models`);
         const images = await executeQuery(`SELECT model_id, image_path FROM vehicle_model_images`);
 
-        const mappedModels = models.map(model => ({
-            ...model,
-            images: images.filter(img => img.model_id === model.id).map(img => img.image_path)
-        }));
+        // Fetch ratings for all models in one go
+        const ratings = await executeQuery(`
+            SELECT vehicle_model_id, ROUND(AVG(rating), 1) AS avg_rating, COUNT(*) AS total_reviews
+            FROM bookings 
+            WHERE rating IS NOT NULL
+            GROUP BY vehicle_model_id
+        `);
+
+        const ratingsMap = {};
+        ratings.forEach(r => {
+            ratingsMap[r.vehicle_model_id] = {
+                avg_rating: r.avg_rating,
+                total_reviews: r.total_reviews
+            };
+        });
+
+        const mappedModels = models.map(model => {
+            const ratingInfo = ratingsMap[model.id] || { avg_rating: null, total_reviews: 0 };
+            return {
+                ...model,
+                images: images.filter(img => img.model_id === model.id).map(img => img.image_path),
+                avg_rating: ratingInfo.avg_rating,
+                total_reviews: ratingInfo.total_reviews
+            };
+        });
 
         res.status(200).json(mappedModels);
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 }
+
 
 // Update a vehicle model
 async function updateVehicleModel(req, res) {
