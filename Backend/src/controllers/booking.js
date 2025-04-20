@@ -99,37 +99,82 @@ async function bookCar(req, res) {
 
 
 async function viewBookingHistory(req, res) {
-    const user_id = req.user.id;
-  
-    try {
-      const bookings = await executeQuery(
-        `SELECT b.id AS booking_id,
-       b.vehicle_id,b.rating,b.review,
-       v.id AS vehicle_exists,
-       b.vehicle_model_id,
-       vm.id AS model_exists,
-       vm.brand_id,
-       vb.id AS brand_exists
-FROM bookings b
-LEFT JOIN vehicles v ON b.vehicle_id = v.id
-LEFT JOIN vehicle_models vm ON b.vehicle_model_id = vm.id
-LEFT JOIN vehicle_brands vb ON vm.brand_id = vb.id
-WHERE b.user_id = ?;
-`,
-        [user_id]
-      );
-       console.log(bookings);
+  const user_id = req.user.id;
+
+  try {
+      const bookings = await executeQuery(`
+          SELECT 
+              b.id AS booking_id,
+              b.rating,
+              b.review,
+              b.booking_date,
+              b.return_date,
+              b.booking_status,
+              b.total_amount,
+              b.payment_status,
+              b.created_at,
+
+              v.id AS vehicle_id,
+              v.plate_number,
+              v.color,
+              v.availability_status,
+
+              vm.id AS model_id,
+              vm.model_name,
+
+              vb.id AS brand_id,
+              vb.brand_name
+
+          FROM bookings b
+          LEFT JOIN vehicles v ON b.vehicle_id = v.id
+          LEFT JOIN vehicle_models vm ON b.vehicle_model_id = vm.id
+          LEFT JOIN vehicle_brands vb ON vm.brand_id = vb.id
+          WHERE b.user_id = ?
+          ORDER BY b.created_at DESC;
+      `, [user_id]);
+
       if (bookings.length === 0) {
-        return res.status(404).json({ message: 'No booking history found.' });
+          return res.status(404).json({ message: 'No booking history found.' });
       }
-  
-      res.status(200).json({ bookings });
-    } catch (err) {
+
+      // Collect all vehicle_ids and model_ids
+      const vehicleIds = bookings.map(b => b.vehicle_id);
+      const modelIds = bookings.map(b => b.model_id);
+
+      // Fetch images in bulk
+      const [vehicleImages, modelImages] = await Promise.all([
+          executeQuery(`SELECT vehicle_id, image_path FROM vehicle_images WHERE vehicle_id IN (?)`, [vehicleIds]),
+          executeQuery(`SELECT model_id, image_path FROM vehicle_model_images WHERE model_id IN (?)`, [modelIds])
+      ]);
+
+      // Create maps for fast lookup
+      const vehicleImageMap = {};
+      vehicleImages.forEach(img => {
+          if (!vehicleImageMap[img.vehicle_id]) vehicleImageMap[img.vehicle_id] = [];
+          vehicleImageMap[img.vehicle_id].push(img.image_path);
+      });
+
+      const modelImageMap = {};
+      modelImages.forEach(img => {
+          if (!modelImageMap[img.model_id]) modelImageMap[img.model_id] = [];
+          modelImageMap[img.model_id].push(img.image_path);
+      });
+
+      // Append images to bookings
+      const enrichedBookings = bookings.map(b => ({
+          ...b,
+          vehicle_images: vehicleImageMap[b.vehicle_id] || [],
+          model_images: modelImageMap[b.model_id] || []
+      }));
+
+      res.status(200).json({ bookings: enrichedBookings });
+  } catch (err) {
       console.error('Error fetching booking history:', err.message);
       res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
-    }
   }
-  
+}
+
+
 
   async function cancelBooking(req, res) {
     const user_id = req.user.id;
@@ -172,25 +217,75 @@ WHERE b.user_id = ?;
 
   async function viewAllBookings(req, res) {
     try {
-      const bookings = await executeQuery(
-        'SELECT * FROM bookings ORDER BY booking_date DESC'
-      );
-  
-      if (!bookings.length) {
-        return res.status(404).json({ message: 'No bookings found.' });
-      }
-  
-      res.status(200).json({
-        message: 'All bookings retrieved successfully.',
-        bookings
-      });
-    } catch (err) {
-      console.error('Error retrieving all bookings:', err.message);
-      res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
-    }
-  }
+        const bookings = await executeQuery(
+            `SELECT 
+                b.id AS booking_id,
+                b.booking_date,
+                b.return_date,
+                b.booking_status,
+                b.total_amount,
+                b.current_address,
+                b.payment_status,
+                u.id AS user_id,
+                u.name AS user_name,
+                u.email AS user_email,
+                u.phone_number AS user_phone_number,
+                u.license_number AS user_license_number,
+                u.licence_image AS user_licence_image,
+                u.aadhaar_image AS user_aadhaar_image,
+                u.role AS user_role,
+                a.house_no,
+                a.street,
+                a.area,
+                a.city,
+                a.state,
+                a.zip_code,
+                a.country,
+                v.id AS vehicle_id,
+                v.registration_no,
+                v.plate_number,
+                v.color AS vehicle_color,
+                v.availability_status AS vehicle_availability_status,
+                -- Separate image lists for vehicle and vehicle model
+                GROUP_CONCAT(DISTINCT vi.image_path) AS vehicle_images,
+                GROUP_CONCAT(DISTINCT vmi.image_path) AS vehicle_model_images,
+                vm.id AS vehicle_model_id,
+                vm.model_name AS vehicle_model_name,
+                vm.category AS vehicle_model_category,
+                vm.price_per_day AS vehicle_model_price_per_day,
+                vb.id AS vehicle_brand_id,
+                vb.brand_name AS vehicle_brand_name,
+                vb.brand_logo AS vehicle_brand_logo
+            FROM 
+                bookings b
+            JOIN users u ON b.user_id = u.id
+            LEFT JOIN addresses a ON u.id = a.user_id
+            JOIN vehicles v ON b.vehicle_id = v.id
+            JOIN vehicle_models vm ON v.model_id = vm.id
+            JOIN vehicle_brands vb ON vm.brand_id = vb.id
+            LEFT JOIN vehicle_images vi ON v.id = vi.vehicle_id
+            LEFT JOIN vehicle_model_images vmi ON vm.id = vmi.model_id
+            GROUP BY 
+                b.id, a.house_no, a.street, a.area, a.city, a.state, a.zip_code, a.country, 
+                v.id, v.registration_no, v.plate_number, v.color, v.availability_status, 
+                vm.id, vm.model_name, vm.category, vm.price_per_day, 
+                vb.id, vb.brand_name, vb.brand_logo`
+        );
 
- 
+        if (!bookings.length) {
+            return res.status(404).json({ message: 'No bookings found.' });
+        }
+
+        res.status(200).json({
+            message: 'All bookings retrieved successfully.',
+            bookings
+        });
+    } catch (err) {
+        console.error('Error retrieving all bookings:', err.message);
+        res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
+    }
+}
+
   async function updateBookingStatus(req, res) {
     const booking_id = req.params.id;
     const { status } = req.body;

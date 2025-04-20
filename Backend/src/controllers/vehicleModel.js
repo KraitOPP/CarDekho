@@ -73,7 +73,11 @@ async function getVehicleModel(req, res) {
             return res.status(404).json({ message: 'Model not found' });
         }
 
-        const images = await executeQuery(`SELECT image_path FROM vehicle_model_images WHERE model_id=?`, [id]);
+        const images = await executeQuery(
+            `SELECT image_path FROM vehicle_model_images WHERE model_id=?`,
+            [id]
+        );
+
         const ratingResult = await executeQuery(
             `SELECT ROUND(AVG(rating), 1) AS avg_rating, COUNT(*) AS total_reviews
              FROM bookings 
@@ -81,18 +85,30 @@ async function getVehicleModel(req, res) {
             [id]
         );
 
+        const vehicleCount = await executeQuery(
+            `SELECT COUNT(*) AS available_vehicle_count 
+             FROM vehicles 
+             WHERE model_id = ? AND availability_status = 'available'`,
+            [id]
+        );
+
         const avg_rating = ratingResult[0].avg_rating || null;
         const total_reviews = ratingResult[0].total_reviews || 0;
+        const available_vehicle_count = vehicleCount[0].available_vehicle_count || 0;
+        let isAvailable=available_vehicle_count>0?true:false;
         res.status(200).json({
             model: model[0],
             images: images.map(img => img.image_path),
             avg_rating,
-            total_reviews
+            total_reviews,
+            available_vehicle_count,
+            isAvailable
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
 }
+
 
 // Get all vehicle models
 async function getAllVehicleModels(req, res) {
@@ -100,12 +116,18 @@ async function getAllVehicleModels(req, res) {
         const models = await executeQuery(`SELECT * FROM vehicle_models`);
         const images = await executeQuery(`SELECT model_id, image_path FROM vehicle_model_images`);
 
-        // Fetch ratings for all models in one go
         const ratings = await executeQuery(`
             SELECT vehicle_model_id, ROUND(AVG(rating), 1) AS avg_rating, COUNT(*) AS total_reviews
             FROM bookings 
             WHERE rating IS NOT NULL
             GROUP BY vehicle_model_id
+        `);
+
+        const availableVehicles = await executeQuery(`
+            SELECT model_id, COUNT(*) AS available_vehicle_count
+            FROM vehicles 
+            WHERE availability_status = 'available'
+            GROUP BY model_id
         `);
 
         const ratingsMap = {};
@@ -116,13 +138,23 @@ async function getAllVehicleModels(req, res) {
             };
         });
 
+        const availabilityMap = {};
+        availableVehicles.forEach(v => {
+            availabilityMap[v.model_id] = v.available_vehicle_count;
+        });
+
         const mappedModels = models.map(model => {
             const ratingInfo = ratingsMap[model.id] || { avg_rating: null, total_reviews: 0 };
+            const availableCount = availabilityMap[model.id] || 0;
+            const isAvailable=availabilityMap[model.id]?true:false;
+
             return {
                 ...model,
                 images: images.filter(img => img.model_id === model.id).map(img => img.image_path),
                 avg_rating: ratingInfo.avg_rating,
-                total_reviews: ratingInfo.total_reviews
+                total_reviews: ratingInfo.total_reviews,
+                available_vehicle_count: availableCount,
+                isAvailable
             };
         });
 
