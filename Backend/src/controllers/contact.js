@@ -118,6 +118,7 @@ async function respondToQuery(req, res) {
           </div>
         `
       });
+      await executeQuery('UPDATE contact_queries SET response= ? WHERE id = ?', [response, id]);
   
       res.status(200).json({ message: 'Response sent to user via email.' });
     } catch (error) {
