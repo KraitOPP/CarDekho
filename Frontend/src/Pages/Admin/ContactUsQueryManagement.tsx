@@ -50,11 +50,11 @@ import { toast } from "sonner";
 import {
   useGetContactQueriesQuery,
   useUpdateContactQueryStatusMutation,
-  useDeleteContactQueryMutation
+  useDeleteContactQueryMutation,
+  useReplyQueryMutation
 } from '@/slices/contactApiSlice';
 
-// Updated to match backend status values
-type QueryStatus = 'pending' | 'in-progress' | 'resolved' | 'closed';
+type QueryStatus = 'pending' | 'resolved' | 'closed';
 
 interface ContactQuery {
   id: number;
@@ -65,12 +65,7 @@ interface ContactQuery {
   message: string;
   status: QueryStatus;
   created_at: string;
-  replies?: {
-    id: number;
-    adminName: string;
-    message: string;
-    sentAt: string;
-  }[];
+  response?: string; // Single response string
 }
 
 const ContactManagement: React.FC = () => {
@@ -84,6 +79,8 @@ const ContactManagement: React.FC = () => {
     useUpdateContactQueryStatusMutation();
   const [deleteContactQuery, { isLoading: isDeleting }] =
     useDeleteContactQueryMutation();
+  const [replyQuery, { isLoading: isReplying }] = 
+    useReplyQueryMutation();
 
   const [queries, setQueries] = useState<ContactQuery[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -96,10 +93,11 @@ const ContactManagement: React.FC = () => {
 
   useEffect(() => {
     if (apiData) {
-      // Map directly from the API data structure without field conversion
+      // Map directly from the API data structure
       const mapped = apiData.map(item => ({
         ...item,
-        replies: item.replies || []
+        // Handle the case where response might not exist
+        response: item.response || ''
       }));
       setQueries(mapped);
     }
@@ -108,7 +106,6 @@ const ContactManagement: React.FC = () => {
   // Updated status color map to match backend statuses
   const statusColorMap = {
     pending: 'secondary',
-    'in-progress': 'warning',
     resolved: 'success',
     closed: 'destructive'
   } as const;
@@ -123,27 +120,32 @@ const ContactManagement: React.FC = () => {
     );
   }, [queries, statusFilter, searchQuery]);
 
-  const handleReplyToQuery = () => {
+  const handleReplyToQuery = async () => {
     if (selectedQuery && replyMessage.trim()) {
-      const newReply = {
-        id: (selectedQuery.replies?.length || 0) + 1,
-        adminName: 'Support Admin',
-        message: replyMessage,
-        sentAt: new Date().toISOString()
-      };
-      
-      // Update the status to in-progress when replying
-      updateQueryStatus('in-progress');
-      
-      setQueries(queries.map(q =>
-        q.id === selectedQuery.id
-          ? { ...q, status: 'in-progress' as QueryStatus, replies: [...(q.replies || []), newReply] }
-          : q
-      ));
-      setIsReplyOpen(false);
-      setSelectedQuery(null);
-      setReplyMessage('');
-      toast.success('Reply added');
+      try {
+        // Call the backend API to send the reply
+        await replyQuery({
+          id: selectedQuery.id,
+          payload: { response: replyMessage }
+        }).unwrap();
+        
+        toast.success('Reply sent successfully');
+        
+        // Update status to resolved after successful reply
+        await updateContactQueryStatus({
+          id: selectedQuery.id,
+          payload: { status: 'resolved' }
+        }).unwrap();
+        
+        refetch(); // Refresh data from server
+        
+        // Close dialog and reset state
+        setIsReplyOpen(false);
+        setSelectedQuery(null);
+        setReplyMessage('');
+      } catch (err: any) {
+        toast.error(err.data?.message || 'Failed to send reply');
+      }
     }
   };
 
@@ -213,6 +215,7 @@ const ContactManagement: React.FC = () => {
               <SelectItem value="all">All Queries</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
               <SelectItem value="resolved">Resolved</SelectItem>
+              <SelectItem value="closed">Closed</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -259,16 +262,19 @@ const ContactManagement: React.FC = () => {
                       >
                         <Eye className="mr-2 w-4 h-4" /> View
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedQuery(query);
-                          setIsReplyOpen(true);
-                        }}
-                      >
-                        <Reply className="mr-2 w-4 h-4" /> Reply
-                      </Button>
+                      {/* Only show Reply button for non-resolved queries */}
+                      {query.status !== 'resolved' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedQuery(query);
+                            setIsReplyOpen(true);
+                          }}
+                        >
+                          <Reply className="mr-2 w-4 h-4" /> Reply
+                        </Button>
+                      )}
                       <Button
                         variant="destructive"
                         size="sm"
@@ -341,35 +347,37 @@ const ContactManagement: React.FC = () => {
                 </p>
               </div>
 
-              {/* Replies Section */}
-              {selectedQuery.replies && selectedQuery.replies.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-lg font-semibold mb-2">Replies</h3>
-                  {selectedQuery.replies.map((reply) => (
-                    <div key={reply.id} className="border-b py-2">
-                      <div className="flex justify-between">
-                        <p className="font-medium">{reply.adminName}</p>
-                        <p className="text-muted-foreground text-sm">
-                          {new Date(reply.sentAt).toLocaleString()}
-                        </p>
-                      </div>
-                      <p className="mt-1">{reply.message}</p>
-                    </div>
-                  ))}
+              {/* Admin Response Section - Only show for resolved queries with a response */}
+              {selectedQuery.status === 'resolved' && selectedQuery.response && (
+                <div className="grid grid-cols-4 items-start gap-4">
+                  <p className="font-bold">Admin Response:</p>
+                  <div className="col-span-3 whitespace-pre-wrap border p-3 rounded-md bg-muted/50">
+                    {selectedQuery.response}
+                  </div>
                 </div>
               )}
 
-              {/* Status Update Buttons */}
-              <DialogFooter className="mt-4">
-                <div className="flex space-x-2">
-                  <Button variant="outline" onClick={() => updateQueryStatus('pending')}>
-                    Mark In Progress
-                  </Button>
-                  <Button variant="outline" onClick={() => updateQueryStatus('resolved')}>
-                    Mark Resolved
-                  </Button>
-                </div>
-              </DialogFooter>
+              {/* Status Update Buttons - Only show for non-resolved queries */}
+              {selectedQuery.status !== 'resolved' && (
+                <DialogFooter className="mt-4">
+                  <div className="flex space-x-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => updateQueryStatus('resolved')}
+                      disabled={isUpdating}
+                    >
+                      Mark Resolved
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => updateQueryStatus('closed')}
+                      disabled={selectedQuery.status === 'closed' || isUpdating}
+                    >
+                      Mark Closed
+                    </Button>
+                  </div>
+                </DialogFooter>
+              )}
             </div>
           )}
         </DialogContent>
@@ -413,9 +421,9 @@ const ContactManagement: React.FC = () => {
                 <Button
                   type="submit"
                   onClick={handleReplyToQuery}
-                  disabled={!replyMessage.trim()}
+                  disabled={!replyMessage.trim() || isReplying}
                 >
-                  <Mail className="mr-2 w-4 h-4" /> Send Reply
+                  <Mail className="mr-2 w-4 h-4" /> {isReplying ? 'Sending...' : 'Send Reply'}
                 </Button>
               </DialogFooter>
             </div>

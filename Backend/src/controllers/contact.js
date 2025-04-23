@@ -118,7 +118,7 @@ async function respondToQuery(req, res) {
           </div>
         `
       });
-      await executeQuery('UPDATE contact_queries SET response= ? WHERE id = ?', [response, id]);
+      await executeQuery('UPDATE contact_queries SET response= ?, status=? WHERE id = ?', [response, "resolved",id]);
   
       res.status(200).json({ message: 'Response sent to user via email.' });
     } catch (error) {

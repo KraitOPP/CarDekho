@@ -21,7 +21,7 @@ import {
 
 type Booking = {
   booking_id: number;
-  id?: number; // Handle both field naming conventions
+  id?: number; 
   user_id?: number;
   vehicle_id?: number;
   vehicle_model_id?: number;

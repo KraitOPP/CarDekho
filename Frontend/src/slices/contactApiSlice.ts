@@ -21,6 +21,13 @@ const contactApiSlice = apiSlice.injectEndpoints({
                 body: payload,
             })
         }),
+        replyQuery : builder.mutation({
+            query: ({id, payload})=>({
+                url: `/contact/response/${id}`,
+                method:"POST",
+                body: payload,
+            })
+        }),
         updateContactQueryStatus: builder.mutation({
             query: ({id, payload})=>({
                 url: `/contact/update-status/${id}`,
@@ -44,4 +51,4 @@ const contactApiSlice = apiSlice.injectEndpoints({
     })
 });
 
-export const {useGetContactInfoQuery, useGetContactQueriesQuery, useAddContactQueryMutation, useUpdateContactInfoMutation, useUpdateContactQueryStatusMutation, useDeleteContactQueryMutation} = contactApiSlice;
+export const {useGetContactInfoQuery, useGetContactQueriesQuery, useAddContactQueryMutation, useUpdateContactInfoMutation, useUpdateContactQueryStatusMutation, useReplyQueryMutation, useDeleteContactQueryMutation} = contactApiSlice;

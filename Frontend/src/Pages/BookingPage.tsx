@@ -23,6 +23,8 @@ import { useGetProfileInfoQuery } from '@/slices/authApiSlice';
 import { toast } from 'sonner';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Loader2, FileImage } from 'lucide-react';
+import { useSelector, UseSelector } from 'react-redux';
+import { selectUser } from '@/slices/authSlice';
 
 export default function CarRentalPage(): React.JSX.Element {
   const navigate = useNavigate();
@@ -30,6 +32,8 @@ export default function CarRentalPage(): React.JSX.Element {
   const { data: vehicleData, isLoading: isLoadingVehicle, error: vehicleError } = useGetVehicleModelQuery(id);
   const { data: profileData, isLoading: isLoadingProfile } = useGetProfileInfoQuery();
   const [addBooking, { isLoading: isBooking }] = useAddBookingMutation();
+
+  const userInfo = useSelector(selectUser);
 
   const [pickupLocation, setPickupLocation] = useState('');
   const [pickupDate, setPickupDate] = useState('');
