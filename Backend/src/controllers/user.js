@@ -2,7 +2,7 @@ const { executeQuery } = require('../db/db.js');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const {uploadOnCloudinary,deleteFromCloudinary}=require('../middlewares/cloudinary.js')
-const {sendEmail}=require('../utils/mail.js')
+const {sendEmail,transporter}=require('../utils/mail.js')
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const ACCESS_TOKEN_EXPIRES_IN = process.env.ACCESS_TOKEN_EXPIRES_IN;
@@ -376,26 +376,37 @@ async function forgotPassword(req, res) {
       [otp, expiresAt, email]
     );
 
-    await sendEmail(
-      email,
-      'CarDekho - Your One-Time Password (OTP)',
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: 'CarDekho - Your One-Time Password (OTP)',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 10px; background-color: #f9f9f9;">
+          <h2 style="color: #d32f2f; text-align: center;">CarDekho OTP Verification</h2>
+          <p style="font-size: 16px; color: #333;">Dear Customer,</p>
+          
+          <p style="font-size: 16px; color: #333;">
+            Thank you for choosing <strong style="color: #d32f2f;">CarDekho</strong> for your car rental needs!
+          </p>
+          
+          <p style="font-size: 16px; color: #333;">
+            Your One-Time Password (OTP) for verification is:
+            <span style="display: inline-block; font-size: 20px; font-weight: bold; color: #ffffff; background-color: #d32f2f; padding: 10px 20px; border-radius: 5px; margin-top: 10px;">${otp}</span>
+          </p>
+          
+          <p style="font-size: 16px; color: #333;">🔒 Please do not share this OTP with anyone.</p>
+          <p style="font-size: 16px; color: #333;">⏱️ This code is valid for the next 10 minutes.</p>
+    
+          <p style="font-size: 16px; color: #555;">
+            If you didn’t request this, please ignore this email or contact our support team.
+          </p>
+    
+          <p style="font-size: 16px; color: #333;">Safe travels,<br>🚗 CarDekho Team</p>
+        </div>
       `
-      Dear Customer, 
+    });
     
-      Thank you for choosing **CarDekho** for your car rental needs!
     
-      Your One-Time Password (OTP) for verification is: **${otp}**
-    
-      🔒 Please do not share this OTP with anyone.  
-      ⏱️ This code is valid for the next 10 minutes.
-    
-      If you didn’t request this, please ignore this email or contact our support team.
-    
-      Safe travels,  
-      🚗 CarDekho Team  
-      [www.cardekho.com](https://www.cardekho.com)
-      `
-    );
     
 
     res.json({ message: 'OTP sent to your email.' });
@@ -417,7 +428,7 @@ async function resetPassword(req, res) {
     if (otp !== otp_code || new Date() > new Date(otp_expires_at)) {
       return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
-
+    const saltRounds = 10;
     const hashedPassword =await bcrypt.hash(newPassword, saltRounds); 
 
     await executeQuery(
