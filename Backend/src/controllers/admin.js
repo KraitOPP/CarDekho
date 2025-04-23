@@ -36,7 +36,7 @@ async function getAdminStats(req, res){
       totalTestimonials: totalTestimonials[0].count,
       availableVehicles: availableVehicles[0].count,
       unavailableVehicles: unavailableVehicles[0].count,
-      monthlyRevenue // Array of objects: [{ month: '2025-04', revenue: 12345.67 }, ...]
+      monthlyRevenue 
     });
   } catch (error) {
     console.error('Error fetching admin stats:', error.message);

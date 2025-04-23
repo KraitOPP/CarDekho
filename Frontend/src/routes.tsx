@@ -20,6 +20,7 @@ import ContactUsManagement from "./Pages/Admin/ContactPageManagement";
 import BookingHistoryPage from "./Pages/User/BookingHistory";
 import ProfilePage from "./Pages/User/profile";
 import VehicleModelManagement from "./Pages/Admin/AddVehicleModel";
+import BookingDetailsPage from "./Pages/Admin/BookingDetails";
 
 export const router = createBrowserRouter([
   {
@@ -85,6 +86,10 @@ export const router = createBrowserRouter([
       {
           path: "booking",
           element: <BookingManagement />
+      },
+      {
+          path: "booking/:id",
+          element: <BookingDetailsPage />
       },
       {
           path: "users",

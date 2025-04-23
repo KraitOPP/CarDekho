@@ -22,6 +22,12 @@ const authApiSlice = apiSlice.injectEndpoints({
                 method:"GET",
             })
         }),
+        getAllUsers : builder.query({
+            query: ()=>({
+                url: "/user/all",
+                method:"GET",
+            })
+        }),
         updateProfile : builder.mutation({
             query: (data)=>({
                 url: "/user/update",
@@ -45,4 +51,4 @@ const authApiSlice = apiSlice.injectEndpoints({
     })
 });
 
-export const {useLoginMutation, useRegisterMutation, useUpdateProfileMutation, useUpdatePasswordMutation, useLogoutMutation, useGetProfileInfoQuery} = authApiSlice
+export const {useLoginMutation, useRegisterMutation, useGetAllUsersQuery, useUpdateProfileMutation, useUpdatePasswordMutation, useLogoutMutation, useGetProfileInfoQuery} = authApiSlice

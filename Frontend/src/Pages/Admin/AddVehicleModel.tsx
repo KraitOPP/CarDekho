@@ -231,7 +231,7 @@ const VehicleModelManagement: React.FC = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="mb-4">
-                      <p className="text-lg font-semibold">${model.price_per_day}/day</p>
+                      <p className="text-lg font-semibold">₹{model.price_per_day}/day</p>
                       <div className="flex items-center text-sm text-gray-500 mt-1">
                         <span className="mr-3">{model.fuel_type}</span>
                         <span className="mr-3">{model.transmission}</span>
@@ -383,7 +383,7 @@ const VehicleModelManagement: React.FC = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="price_per_day">Price per Day ($)</Label>
+                    <Label htmlFor="price_per_day">Price per Day (₹)</Label>
                     <Input
                       id="price_per_day"
                       type="number"

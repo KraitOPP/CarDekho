@@ -232,7 +232,7 @@ const BrandManagement: React.FC = () => {
                 )}
               </div>
             </div>
-            <Button type="submit" disabled={isAdding} className="max-w-50">
+            <Button type="submit" disabled={isAdding} className="w-full">
               {isAdding ? "Adding..." : "Add Brand"}
             </Button>
           </form>
@@ -328,11 +328,11 @@ const BrandManagement: React.FC = () => {
                   )}
                 </div>
               </div>
-              <div className="flex space-x-2 pt-4">
+              <div className="flex justify-end space-x-2 pt-4">
                 <Button variant="outline" type="button" onClick={() => setEditingBrand(null)}>
                   <X className="mr-2 w-4 h-4" /> Cancel
                 </Button>
-                <Button type="submit" disabled={isUpdating} className="max-w-30">
+                <Button type="submit" disabled={isUpdating} className="w-full">
                   {isUpdating ? "Saving..." : "Save Changes"}
                 </Button>
               </div>

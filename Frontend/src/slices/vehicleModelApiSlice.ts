@@ -8,6 +8,12 @@ const vehicleModelApiSlice = apiSlice.injectEndpoints({
                 method:"GET",
             })
         }),
+        getVehicleModel : builder.query({
+            query: (id)=>({
+                url: `/vehicle-model/get-vehicle-model/${id}`,
+                method:"GET",
+            })
+        }),
         addVehicleModel : builder.mutation({
             query: (payload)=>({
                 url: "/vehicle-model/add-vehicle-model",
@@ -31,4 +37,4 @@ const vehicleModelApiSlice = apiSlice.injectEndpoints({
     })
 });
 
-export const {useAddVehicleModelMutation, useGetVehicleModelsQuery, useUpdateVehicleModelMutation, useDeleteVehicleModelMutation} = vehicleModelApiSlice;
+export const {useAddVehicleModelMutation, useGetVehicleModelsQuery, useGetVehicleModelQuery, useUpdateVehicleModelMutation, useDeleteVehicleModelMutation} = vehicleModelApiSlice;
