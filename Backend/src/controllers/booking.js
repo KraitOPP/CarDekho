@@ -288,45 +288,52 @@ async function viewBookingHistory(req, res) {
     }
 }
 
-  async function updateBookingStatus(req, res) {
-    const booking_id = req.params.id;
-    const { status } = req.body;
-  
-    if (!status) {
-      return res.status(400).json({ error: 'Booking status is required.' });
-    }
-  
-    try {
-      const booking = await executeQuery(
-        'SELECT * FROM bookings WHERE id = ?',
-        [booking_id]
-      );
-  
-      if (!booking.length) {
-        return res.status(404).json({ error: 'Booking not found.' });
-      }
-  
-      await executeQuery(
-        'UPDATE bookings SET booking_status = ? WHERE id = ?',
-        [status, booking_id]
-      );
-  
-      if (status === 'Cancelled') {
-        await executeQuery(
-          'UPDATE vehicles SET status = "Available" WHERE id = ?',
-          [booking[0].vehicle_id]
-        );
-      }
-  
-      res.status(200).json({
-        message: `Booking status updated to ${status}.`,
-        booking_id
-      });
-    } catch (err) {
-      console.error('Error updating booking status:', err.message);
-      res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
-    }
+async function updateBookingStatus(req, res) {
+  const booking_id = req.params.id;
+  const { status } = req.body;
+
+  if (!status) {
+    return res.status(400).json({ error: 'Booking status is required.' });
   }
+
+  const validStatuses = ['pending', 'confirmed', 'cancelled', 'completed'];
+  if (!validStatuses.includes(status.toLowerCase())) {
+    return res.status(400).json({ error: 'Invalid booking status provided.' });
+  }
+
+  try {
+    const booking = await executeQuery(
+      'SELECT * FROM bookings WHERE id = ?',
+      [booking_id]
+    );
+
+    if (!booking.length) {
+      return res.status(404).json({ error: 'Booking not found.' });
+    }
+
+    await executeQuery(
+      'UPDATE bookings SET booking_status = ? WHERE id = ?',
+      [status, booking_id]
+    );
+
+    // If booking is cancelled or completed, mark vehicle as available
+    if (status === 'cancelled' || status === 'completed') {
+      await executeQuery(
+        'UPDATE vehicles SET availability_status = "available" WHERE id = ?',
+        [booking[0].vehicle_id]
+      );
+    }
+
+    res.status(200).json({
+      message: `Booking status updated to ${status}.`,
+      booking_id
+    });
+  } catch (err) {
+    console.error('Error updating booking status:', err.message);
+    res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
+  }
+}
+
   async function updatePaymentStatus(req, res) {
     const booking_id = req.params.id;
     const { payment_status } = req.body;
