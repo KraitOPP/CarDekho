@@ -1,7 +1,7 @@
 // routes.js
 const express = require('express');
 const router = express.Router();
-const { signup, login, getCurrUser, logout, updateProfile,getAllUsers, refresh,updatePassword } = require('../controllers/user.js');
+const { signup, login, getCurrUser, logout, updateProfile,getAllUsers, refresh,updatePassword,forgotPassword,resetPassword} = require('../controllers/user.js');
 const {isAdmin}=require('../middlewares/isAdmin.js');
 const { verifyJWT } = require('../middlewares/auth');
 const {upload}=require('../middlewares/cloudinary.js')
@@ -17,5 +17,7 @@ router.put('/update', verifyJWT, upload.fields([
   ]), updateProfile);
 router.put('/update-password',verifyJWT,updatePassword)
 router.get('/all', verifyJWT,isAdmin, getAllUsers);
+router.post('/forgot-password',updatePassword);
+router
 
 module.exports = { router };

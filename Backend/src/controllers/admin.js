@@ -6,6 +6,7 @@ async function getAdminStats(req, res){
       totalUsers,
       totalVehicles,
       totalBookings,
+      totalTestimonials,
       availableVehicles,
       unavailableVehicles,
       monthlyRevenue
@@ -13,6 +14,7 @@ async function getAdminStats(req, res){
       executeQuery('SELECT COUNT(*) AS count FROM users'),
       executeQuery('SELECT COUNT(*) AS count FROM vehicles'),
       executeQuery('SELECT COUNT(*) AS count FROM bookings'),
+      executeQuery('SELECT COUNT(*) AS count FROM testimonials'),
       executeQuery("SELECT COUNT(*) AS count FROM vehicles WHERE availability_status = 'available'"),
       executeQuery("SELECT COUNT(*) AS count FROM vehicles WHERE availability_status != 'available'"),
       executeQuery(`
@@ -31,6 +33,7 @@ async function getAdminStats(req, res){
       totalUsers: totalUsers[0].count,
       totalVehicles: totalVehicles[0].count,
       totalBookings: totalBookings[0].count,
+      totalTestimonials: totalTestimonials[0].count,
       availableVehicles: availableVehicles[0].count,
       unavailableVehicles: unavailableVehicles[0].count,
       monthlyRevenue // Array of objects: [{ month: '2025-04', revenue: 12345.67 }, ...]

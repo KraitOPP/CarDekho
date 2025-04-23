@@ -2,7 +2,7 @@ const { executeQuery } = require('../db/db.js');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const {uploadOnCloudinary,deleteFromCloudinary}=require('../middlewares/cloudinary.js')
-
+const {sendEmail}=require('../utils/mail.js')
 const JWT_ACCESS_SECRET = process.env.JWT_ACCESS_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 const ACCESS_TOKEN_EXPIRES_IN = process.env.ACCESS_TOKEN_EXPIRES_IN;
@@ -357,7 +357,81 @@ async function getAllUsers(req, res) {
     return res.status(500).json({ error: 'Internal server error.' });
   }
 }
+function generateOTP() {
+  return (Math.floor(100000 + Math.random() * 900000)).toString(); // 6-digit OTP
+}
+
+async function forgotPassword(req, res) {
+  const { email } = req.body;
+
+  try {
+    const user = await executeQuery('SELECT * FROM users WHERE email = ?', [email]);
+    if (user.length === 0) return res.status(404).json({ message: 'User not found' });
+
+    const otp = generateOTP();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // OTP valid for 10 minutes
+
+    await executeQuery(
+      'UPDATE users SET otp_code = ?, otp_expires_at = ? WHERE email = ?',
+      [otp, expiresAt, email]
+    );
+
+    await sendEmail(
+      email,
+      'CarDekho - Your One-Time Password (OTP)',
+      `
+      Dear Customer, 
+    
+      Thank you for choosing **CarDekho** for your car rental needs!
+    
+      Your One-Time Password (OTP) for verification is: **${otp}**
+    
+      🔒 Please do not share this OTP with anyone.  
+      ⏱️ This code is valid for the next 10 minutes.
+    
+      If you didn’t request this, please ignore this email or contact our support team.
+    
+      Safe travels,  
+      🚗 CarDekho Team  
+      [www.cardekho.com](https://www.cardekho.com)
+      `
+    );
+    
+
+    res.json({ message: 'OTP sent to your email.' });
+  } catch (error) {
+    console.error('Forgot Password Error:', error.message);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+}
+
+
+async function resetPassword(req, res) {
+  const { email, otp, newPassword } = req.body;
+
+  try {
+    const user = await executeQuery('SELECT * FROM users WHERE email = ?', [email]);
+    if (user.length === 0) return res.status(404).json({ message: 'User not found' });
+
+    const { otp_code, otp_expires_at } = user[0];
+    if (otp !== otp_code || new Date() > new Date(otp_expires_at)) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    const hashedPassword =await bcrypt.hash(newPassword, saltRounds); 
+
+    await executeQuery(
+      'UPDATE users SET password = ?, otp_code = NULL, otp_expires_at = NULL WHERE email = ?',
+      [hashedPassword, email]
+    );
+
+    res.json({ message: 'Password reset successful.' });
+  } catch (error) {
+    console.error('Reset Password Error:', error.message);
+    res.status(500).json({ error: 'Internal server error.' });
+  }
+}
 
 
 
-module.exports = { signup, login, getCurrUser, logout, updateProfile,getAllUsers, refresh,updatePassword};
+module.exports = { signup, login, getCurrUser, logout, updateProfile,getAllUsers, refresh,updatePassword,forgotPassword,resetPassword};
