@@ -22,7 +22,7 @@ async function getAdminStats(req, res){
           DATE_FORMAT(booking_date, '%Y-%m') AS month,
           SUM(total_amount) AS revenue
         FROM bookings
-        WHERE booking_status = 'confirmed'
+        WHERE booking_status = 'completed'
         GROUP BY month
         ORDER BY month DESC
         LIMIT 12

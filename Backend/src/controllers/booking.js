@@ -390,6 +390,9 @@ async function updateBookingStatus(req, res) {
                 u.name AS user_name,
                 u.email,
                 u.phone_number,
+                u.license_number,
+                u.licence_image,
+                u.aadhaar_image,
                 GROUP_CONCAT(DISTINCT vi.image_path) AS vehicle_images,
                 GROUP_CONCAT(DISTINCT vmi.image_path) AS vehicle_model_images
             FROM bookings b

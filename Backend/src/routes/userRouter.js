@@ -17,7 +17,7 @@ router.put('/update', verifyJWT, upload.fields([
   ]), updateProfile);
 router.put('/update-password',verifyJWT,updatePassword)
 router.get('/all', verifyJWT,isAdmin, getAllUsers);
-router.post('/forgot-password',updatePassword);
-router
+router.post('/forgot-password',forgotPassword);
+router.put('/reset-password',resetPassword)
 
 module.exports = { router };
