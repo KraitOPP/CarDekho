@@ -226,6 +226,8 @@ async function viewBookingHistory(req, res) {
                 b.total_amount,
                 b.current_address,
                 b.payment_status,
+                b.rating,
+                b.review,
                 u.id AS user_id,
                 u.name AS user_name,
                 u.email AS user_email,
@@ -360,33 +362,52 @@ async function viewBookingHistory(req, res) {
   
   async function getBookingInfoById(req, res) {
     const booking_id = req.params.id;
-  
+
     try {
-      const bookings = await executeQuery(
-        `SELECT b.id, b.booking_date,b.rating,b.review, b.return_date, b.booking_status, b.payment_status, b.total_amount, b.current_address,
-                v.registration_no, v.plate_number, v.color,
+        const bookings = await executeQuery(
+            `SELECT 
+                b.id, 
+                b.booking_date,
+                b.return_date,
+                b.booking_status,
+                b.payment_status,
+                b.total_amount,
+                b.current_address,
+                b.rating,
+                b.review,
+                v.registration_no,
+                v.plate_number,
+                v.color,
                 vm.model_name AS vehicle_model,
                 vb.brand_name AS vehicle_brand,
-                u.name AS user_name, u.email, u.phone_number
-         FROM bookings b
-         JOIN vehicles v ON b.vehicle_id = v.id
-         JOIN vehicle_models vm ON b.vehicle_model_id = vm.id
-         JOIN vehicle_brands vb ON vm.brand_id = vb.id
-         JOIN users u ON b.user_id = u.id
-         WHERE b.id = ?`,
-        [booking_id]
-      );
-  
-      if (!bookings.length) {
-        return res.status(404).json({ error: 'Booking not found.' });
-      }
-  
-      res.status(200).json({ booking: bookings[0] });
+                u.name AS user_name,
+                u.email,
+                u.phone_number,
+                GROUP_CONCAT(DISTINCT vi.image_path) AS vehicle_images,
+                GROUP_CONCAT(DISTINCT vmi.image_path) AS vehicle_model_images
+            FROM bookings b
+            JOIN vehicles v ON b.vehicle_id = v.id
+            JOIN vehicle_models vm ON v.model_id = vm.id
+            JOIN vehicle_brands vb ON vm.brand_id = vb.id
+            JOIN users u ON b.user_id = u.id
+            LEFT JOIN vehicle_images vi ON v.id = vi.vehicle_id
+            LEFT JOIN vehicle_model_images vmi ON vm.id = vmi.model_id
+            WHERE b.id = ?
+            GROUP BY b.id`,
+            [booking_id]
+        );
+
+        if (!bookings.length) {
+            return res.status(404).json({ error: 'Booking not found.' });
+        }
+
+        res.status(200).json({ booking: bookings[0] });
     } catch (err) {
-      console.error('Error fetching booking info:', err.message);
-      res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
+        console.error('Error fetching booking info:', err.message);
+        res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
     }
-  }
+}
+
 
   async function rateBooking(req, res) {
     const user_id = req.user.id;
