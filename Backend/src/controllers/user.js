@@ -337,9 +337,18 @@ async function getAllUsers(req, res) {
   try {
     const sql = `
       SELECT 
-        id, name, email, phone_number, license_number 
-      FROM users
+        u.id, 
+        u.name, 
+        u.email, 
+        u.phone_number,
+        u.created_at AS registration_date,
+        COUNT(b.id) AS total_bookings
+      FROM users u
+      LEFT JOIN bookings b ON u.id = b.user_id
+      GROUP BY u.id
+      ORDER BY u.created_at DESC
     `;
+    
     const users = await executeQuery(sql);
 
     return res.status(200).json({ users });
@@ -348,6 +357,7 @@ async function getAllUsers(req, res) {
     return res.status(500).json({ error: 'Internal server error.' });
   }
 }
+
 
 
 module.exports = { signup, login, getCurrUser, logout, updateProfile,getAllUsers, refresh,updatePassword};
