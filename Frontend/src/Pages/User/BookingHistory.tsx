@@ -116,8 +116,7 @@ const BookingHistoryPage: React.FC = () => {
     switch(status.toLowerCase()) {
       case 'completed':
         return <Badge variant="outline" className="bg-green-50 text-green-600">Completed</Badge>;
-      case 'upcoming':
-      case 'active':
+      case 'confirmed':
       case 'pending':
         return <Badge variant="outline" className="bg-blue-50 text-blue-600">{status}</Badge>;
       case 'cancelled':
@@ -146,12 +145,10 @@ const BookingHistoryPage: React.FC = () => {
     if (!status) return null;
     
     switch(status.toLowerCase()) {
-      case 'paid':
-        return <Badge variant="outline" className="bg-green-50 text-green-600">Paid</Badge>;
+      case 'completed':
+        return <Badge variant="outline" className="bg-green-50 text-green-600">Completed</Badge>;
       case 'pending':
         return <Badge variant="outline" className="bg-yellow-50 text-yellow-600">Payment Pending</Badge>;
-      case 'failed':
-        return <Badge variant="outline" className="bg-red-50 text-red-600">Payment Failed</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -159,12 +156,11 @@ const BookingHistoryPage: React.FC = () => {
 
   const renderBookingItem = (booking: Booking) => {
     const status = booking.booking_status || 'unknown';
-    const isActive = status.toLowerCase() === 'active' || status.toLowerCase() === 'upcoming' || status.toLowerCase() === 'pending';
+    const isActive = status.toLowerCase() === 'confirmed' || status.toLowerCase() === 'pending';
     const isCompleted = status.toLowerCase() === 'completed';
-    const isDelivered = booking.delivery_status?.toLowerCase() === 'delivered';
+    const isDelivered = booking.delivery_status?.toLowerCase() === 'completed';
     const hasRated = booking.rating !== null;
     
-    // Determine which images to use, prioritizing vehicle images if available
     const images = booking.vehicle_images && booking.vehicle_images.length > 0 
       ? booking.vehicle_images 
       : booking.model_images && booking.model_images.length > 0 
@@ -304,7 +300,6 @@ const BookingHistoryPage: React.FC = () => {
   const filterBookings = (status: string[] | null) => {
     if (!status) return bookings;
     return bookings.filter(b => {
-      // Safe check for undefined status
       if (!b.booking_status) return false;
       return status.includes(b.booking_status.toLowerCase());
     });
@@ -322,7 +317,7 @@ const BookingHistoryPage: React.FC = () => {
           <Tabs defaultValue="all" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="all">All</TabsTrigger>
-              <TabsTrigger value="active">Active</TabsTrigger>
+              <TabsTrigger value="confirmed">Confirmed</TabsTrigger>
               <TabsTrigger value="completed">Completed</TabsTrigger>
               <TabsTrigger value="cancelled">Cancelled</TabsTrigger>
             </TabsList>
@@ -335,9 +330,9 @@ const BookingHistoryPage: React.FC = () => {
               )}
             </TabsContent>
             
-            <TabsContent value="active">
-              {filterBookings(['active', 'upcoming', 'pending']).length > 0 ? (
-                filterBookings(['active', 'upcoming', 'pending']).map(renderBookingItem)
+            <TabsContent value="confirmed">
+              {filterBookings(['confirmed', 'upcoming', 'pending']).length > 0 ? (
+                filterBookings(['confirmed', 'upcoming', 'pending']).map(renderBookingItem)
               ) : (
                 <div className="py-4 text-center text-gray-500">No active bookings</div>
               )}

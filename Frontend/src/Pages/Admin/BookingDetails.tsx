@@ -76,7 +76,7 @@ const BookingDetailsPage: React.FC = () => {
   const vehicleImages = data.vehicle_images ? data.vehicle_images.split(',') : [];
   const modelImages = data.vehicle_model_images ? data.vehicle_model_images.split(',') : [];
   
-  const displayImages = imageType === 'vehicle' ? vehicleImages : modelImages;
+  const displayImages = imageType === 'model' ? modelImages : modelImages;
   const currentImage = displayImages.length > 0 ? displayImages[activeImageIndex] : null;
 
   const bookingDate = new Date(data.booking_date).toLocaleString();
@@ -168,7 +168,7 @@ const BookingDetailsPage: React.FC = () => {
                       }}
                       disabled={vehicleImages.length === 0}
                     >
-                      Actual Vehicle
+                      Vehicle
                     </Button>
                     <Button 
                       variant={imageType === 'model' ? 'default' : 'outline'} 

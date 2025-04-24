@@ -3,6 +3,7 @@ const { uploadOnCloudinary, deleteFromCloudinary } = require('../middlewares/clo
 
 async function bookCar(req, res) {
   const user_id = req.user.id;
+  
   const {
     model_id,
     booking_date,
@@ -23,6 +24,12 @@ async function bookCar(req, res) {
   }
 
   try {
+    const tableStructure = await executeQuery('DESCRIBE addresses');
+    console.log("Addresses table structure:", tableStructure);
+    
+    const columnNames = tableStructure.map(col => col.Field);
+    console.log("Available columns:", columnNames);
+    
     const userRows = await executeQuery(
       'SELECT license_number, licence_image, aadhaar_image FROM users WHERE id = ?',
       [user_id]
@@ -33,31 +40,18 @@ async function bookCar(req, res) {
     }
 
     const { license_number: existingLicenseNumber, licence_image, aadhaar_image } = userRows[0];
-    let newLicenseNumber = existingLicenseNumber;
+    let newLicenseNumber = license_number || existingLicenseNumber || null;
     let newLicenseImage = licence_image;
     let newAadharImage = aadhaar_image;
 
-    if (!existingLicenseNumber || !licence_image || !aadhaar_image) {
-      const aadhaarImage = req.files?.aadhaar_image?.[0];
-      const licenseImage = req.files?.license_image?.[0];
-
-      if (!aadhaarImage || !licenseImage || !license_number) {
-        return res.status(400).json({
-          error: 'License number, Aadhaar image, and License image are required to be provided.'
-        });
+    if (req.files) {
+      if (req.files.license_image && req.files.license_image[0]) {
+        newLicenseImage = req.files.license_image[0].path || null;
       }
-
-      if (aadhaarImage) {
-        if (aadhaar_image) await deleteFromCloudinary(aadhaar_image);
-        newAadharImage = (await uploadOnCloudinary(aadhaarImage.path))?.url;
+      
+      if (req.files.aadhaar_image && req.files.aadhaar_image[0]) {
+        newAadharImage = req.files.aadhaar_image[0].path || null;
       }
-
-      if (licenseImage) {
-        if (licence_image) await deleteFromCloudinary(licence_image);
-        newLicenseImage = (await uploadOnCloudinary(licenseImage.path))?.url;
-      }
-
-      newLicenseNumber = license_number;
     }
 
     await executeQuery(
@@ -70,16 +64,99 @@ async function bookCar(req, res) {
       [user_id]
     );
 
-    if (!addressRows.length) {
-      if (!house_number || !street || !area || !city || !state || !country || !zip_code) {
-        return res.status(400).json({ error: 'Missing required address fields.' });
+    const fullAddress = `${house_number || ''} ${street || ''} ${area || ''}`.trim() || null;
+    
+    if (addressRows.length > 0) {
+      let updateSQL = 'UPDATE addresses SET ';
+      const updateParams = [];
+      
+      if (columnNames.includes('address')) {
+        updateSQL += 'address = ?, ';
+        updateParams.push(fullAddress);
       }
-
-      await executeQuery(
-        'INSERT INTO addresses (user_id, house_number, street, area, city, state, country, zip_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [user_id, house_number, street, area, city, state, country, zip_code]
-      );
+      
+      if (columnNames.includes('city')) {
+        updateSQL += 'city = ?, ';
+        updateParams.push(city || null);
       }
+      
+      if (columnNames.includes('state')) {
+        updateSQL += 'state = ?, ';
+        updateParams.push(state || null);
+      }
+      
+      if (columnNames.includes('country')) {
+        updateSQL += 'country = ?, ';
+        updateParams.push(country || null);
+      }
+      
+      if (columnNames.includes('zip_code')) {
+        updateSQL += 'zip_code = ?, ';
+        updateParams.push(zip_code || null);
+      } else if (columnNames.includes('zip')) {
+        updateSQL += 'zip = ?, ';
+        updateParams.push(zip_code || null);
+      } else if (columnNames.includes('postal_code')) {
+        updateSQL += 'postal_code = ?, ';
+        updateParams.push(zip_code || null);
+      }
+      
+      updateSQL = updateSQL.slice(0, -2);
+      
+      updateSQL += ' WHERE user_id = ?';
+      updateParams.push(user_id);
+      
+      if (updateParams.length > 1) { 
+        await executeQuery(updateSQL, updateParams);
+      }
+    } else {
+      let insertSQL = 'INSERT INTO addresses (user_id';
+      let valuePlaceholders = '(?';
+      const insertParams = [user_id];
+      
+      if (columnNames.includes('address')) {
+        insertSQL += ', address';
+        valuePlaceholders += ', ?';
+        insertParams.push(fullAddress);
+      }
+      
+      if (columnNames.includes('city')) {
+        insertSQL += ', city';
+        valuePlaceholders += ', ?';
+        insertParams.push(city || null);
+      }
+      
+      if (columnNames.includes('state')) {
+        insertSQL += ', state';
+        valuePlaceholders += ', ?';
+        insertParams.push(state || null);
+      }
+      
+      if (columnNames.includes('country')) {
+        insertSQL += ', country';
+        valuePlaceholders += ', ?';
+        insertParams.push(country || null);
+      }
+      
+      if (columnNames.includes('zip_code')) {
+        insertSQL += ', zip_code';
+        valuePlaceholders += ', ?';
+        insertParams.push(zip_code || null);
+      } else if (columnNames.includes('zip')) {
+        insertSQL += ', zip';
+        valuePlaceholders += ', ?';
+        insertParams.push(zip_code || null);
+      } else if (columnNames.includes('postal_code')) {
+        insertSQL += ', postal_code';
+        valuePlaceholders += ', ?';
+        insertParams.push(zip_code || null);
+      }
+      
+      insertSQL += ') VALUES ' + valuePlaceholders + ')';
+      
+      await executeQuery(insertSQL, insertParams);
+    }
+    
     const resultSets = await executeQuery(
       'CALL CreateBookingWithModel(?, ?, ?, ?, ?)',
       [user_id, model_id, booking_date, return_date, current_address]
@@ -96,8 +173,6 @@ async function bookCar(req, res) {
     res.status(500).json({ error: err.sqlMessage || 'Internal server error' });
   }
 }
-
-
 async function viewBookingHistory(req, res) {
   const user_id = req.user.id;
 

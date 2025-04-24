@@ -3,11 +3,9 @@ import { Car, Users, Calendar, MessageSquare, Activity, DollarSign } from 'lucid
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
-import { Badge } from '@/components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import { useGetDashboardInfoQuery } from '@/slices/adminApiSlice';
 
-// Optional Error Boundary to catch render errors
 class ErrorBoundary extends React.Component {
   constructor(props) {
     super(props);
@@ -33,21 +31,19 @@ class ErrorBoundary extends React.Component {
 const Dashboard = () => {
   const navigate = useNavigate();
   const { data, error, isLoading } = useGetDashboardInfoQuery();
-  console.log(data)
   if (isLoading) return <div>Loading dashboard...</div>;
   if (error) return <div>Error loading dashboard data</div>;
 
-  // Provide defaults to avoid undefined
   const {
     totalUsers = 0,
     totalVehicles = 0,
     totalBookings = 0,
+    totalTestimonials = 0,
     availableVehicles = 0,
     unavailableVehicles = 0,
     monthlyRevenue = []
   } = data || {};
 
-  // Safely map even if monthlyRevenue is missing
   const revenueData = Array.isArray(monthlyRevenue)
     ? monthlyRevenue.map(item => ({ name: item.month, revenue: item.revenue })).reverse()
     : [];
@@ -79,7 +75,7 @@ const Dashboard = () => {
     {
       title: 'Testimonials',
       icon: <MessageSquare className="h-6 w-6" />,
-      count: '—',
+      count: `${totalTestimonials} Total`,
       route: '/dashboard/testimonial'
     }
   ];
